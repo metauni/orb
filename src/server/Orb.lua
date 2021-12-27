@@ -49,14 +49,13 @@ function Orb.InitOrb(orb)
 	-- Attach proximity prompts
 	local proximityPrompt = Instance.new("ProximityPrompt")
 	proximityPrompt.ActionText = "Attach"
-	proximityPrompt.MaxActivationDistance = 5
+	proximityPrompt.MaxActivationDistance = 7
 	proximityPrompt.HoldDuration = 1
 	proximityPrompt.ObjectText = "Orb"
 	proximityPrompt.Parent = orb
 
 	ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
 		if prompt.Parent == orb then
-			print("Orb triggered by"..player.Name)
 			Orb.AddListener(orb, player.UserId)
 			OrbAttachRemoteEvent:FireClient(player, orb)
 		end
