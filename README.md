@@ -20,7 +20,6 @@ Just as metaboards are parts in the world tagged with `metaboard`, an orb is a p
 
 TODO:
 
-- Detach as listener either with proximity prompt or GUI
 - Create ghost near orb on attach
 - Destroy ghost on detach
 - Attach as speaker to orb (no permissions) (proximity)
