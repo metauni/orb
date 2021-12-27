@@ -1,6 +1,4 @@
 local Players = game:GetService("Players")
-local BoardGui = Players.LocalPlayer.PlayerGui:WaitForChild("BoardGui")
-
 local localCharacter = Players.LocalPlayer.Character
 
 if localCharacter then

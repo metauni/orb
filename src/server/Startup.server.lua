@@ -18,11 +18,5 @@ do
 end
 
 local Orb = require(script.Parent.Orb)
-local PersonalBoardManager = require(script.Parent.PersonalBoardManager)
-local ServerDrawingTasks = require(script.Parent.ServerDrawingTasks)
-local Persistence = require(script.Parent.Persistence)
 
-MetaBoard.Init()
-PersonalBoardManager.Init()
-ServerDrawingTasks.Init()
-Persistence.Init()
+Orb.Init()
