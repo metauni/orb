@@ -2,7 +2,9 @@
 
 Orbs are listening devices, often located near metaboards, that people can attach themselves to as listeners so that they continue to hear a talk while elsewhere in the world. They also serve as recording devices for audio and video.
 
-You can access the public [test server](https://www.roblox.com/games/8369549984/Orb-test).
+You can access the public [test server](https://www.roblox.com/games/8369549984/Orb-test) and watch some videos:
+
+- [Initial implementation](https://youtu.be/0vuNKcCv1sk).
 
 ## Usage
 
