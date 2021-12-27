@@ -2,11 +2,11 @@
 	"ClassName": "Folder",
 	"Children": [
 		{
-			"Name": "Attach",
+			"Name": "OrbAttach",
 			"ClassName": "RemoteEvent"
 		},
 		{
-			"Name": "Detach",
+			"Name": "OrbDetach",
 			"ClassName": "RemoteEvent"
 		}
 	]
