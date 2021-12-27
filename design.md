@@ -1,0 +1,15 @@
+# Design
+
+Some of the anecdotal observations that have guided this design:
+
+1. **Speakers value seeing the audience**: especially in a virtual format, it is important for the speaker to see (or hear) from time to time that people are there and listening. Migrating from board to board by foot (e.g. in the festival of math event) is a useful indicator of that to the speaker. Speakers do a better job when they sense investment from the audience. 
+
+2. **Sometimes you think better on your feet**: a typical metauni behaviour is to wander off and find a nice view or something to toy with (an apple to eat in TRS, a ring to sit on in Deprecation) during a talk, and then wander back. With Discord audio you don't miss the audio, although you may not be able to see the board. At least in my case I think this often serves as a virtual substitute for the well known phenomenon of "let's go for a walk and talk on the way". I've heard feedback from multiple people that they find it easier to focus on a talk in metauni than *in a live venue* because in the latter they fidget and want to get up and walk around (I think this is not universal, but it is interesting to note anyway).
+
+3. **Talks as focal events**: I think talks can be useful in at least two ways. Firstly, they teach you something. Secondly, they are a focal event where other people like you will tend to be. Classes are maybe 80/20 first/second and conferences are more like 20/80. You go to conferences for the chats in the tearoom in between talks. This value is not really currently present in metauni, but it should be and I hope spatial voice enables it.
+
+4. **Right to know who is listening**: it isn't perfect, but in physical space you can cheaply compute an estimate of who can hear you (i.e. "look around"). I think a system like spatial voice which tempts you to apply the same heuristics shouldn't then violate those expectations. If someone is getting an audio feed from a location, there should be a very clear indicator that this is the case.
+
+5. **Space as coordination**: the virtue of physicality and simulations thereof is that it is a form of coordination that we all understand intuitively. Space is a set of affordances. E.g. organising boards in physical spaces that look different (say TRS vs Deprecation) makes a difference to memory formation, as is well understood ("memory palaces etc."). I think physical expectations should be respected *by default* but with careful violations allowed to serve higher values (e.g. (2) above).
+
+6. **Recording should be easy**: most talks ever given are now lost. Not every talk should be recorded, but I firmly believe that most should, and that the value we can provide to strangers by sharing them is vastly underestimated by most people. The unborn nerds of the future await your proofs. Making it easy to produce and share high quality recordings of mathematics is a core value of metauni, and the Orb system is designed to be integrated with the automated recording systems (but see value 4).
