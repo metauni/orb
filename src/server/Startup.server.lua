@@ -1,5 +1,5 @@
 do
-	-- Move folder/guis around if they have been packaged inside MetaBoardServer
+	-- Move folder/guis around if they have been packaged inside OrbServer
 	
 	local orbCommon = script.Parent:FindFirstChild("OrbCommon")
 	if orbCommon then
@@ -11,9 +11,9 @@ do
 		orbPlayer.Parent = game:GetService("StarterPlayer").StarterPlayerScripts
 	end
 
-	local boardGui = script.Parent:FindFirstChild("BoardGui")
-	if boardGui then
-		boardGui.Parent = game:GetService("StarterGui")
+	local orbGui = script.Parent:FindFirstChild("OrbGui")
+	if orbGui then
+		orbGui.Parent = game:GetService("StarterGui")
 	end
 end
 
