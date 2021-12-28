@@ -69,7 +69,7 @@ function Orb.Init()
 		Orb.RemoveListenerFromAllOrbs(plr.UserId)
 	end)
 
-	print("Orb Server initialized")
+	print("Orb Server ".. Config.Version .." initialized")
 end
 
 function Orb.InitOrb(orb)
@@ -261,6 +261,7 @@ function Orb.AddGhost(orb, playerId)
 		ghost.Name = tostring(playerId)
 		local distanceOrbPlayer = (orb.Position - character.PrimaryPart.Position).Magnitude
 		local ghostPos = ghost.PrimaryPart.Position - distanceOrbPlayer * ghost.PrimaryPart.CFrame.LookVector
+		ghostPos += Vector3.new(0,0.3,0) -- pop them up in the air a bit
 
 		-- This offset is preserved when walking ghosts
 		Orb.GhostOffsets[ghost.Name] = ghostPos - orb.Position
