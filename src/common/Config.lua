@@ -1,8 +1,7 @@
 local Config = {
 	ObjectTag = "metaorb",
 	DataStoreTag = "orb.",
-
-	CatRomLength = 3/1000,
+	GhostCollisionGroup = "ghosts"
 }
 
 Config.Defaults = {

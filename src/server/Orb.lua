@@ -16,8 +16,11 @@ local Orb = {}
 Orb.__index = Orb
 
 function Orb.Init()
-	local orbs = CollectionService:GetTagged(Config.ObjectTag)
+	-- Offset of ghosts from orbs (playedID -> Vector3)
+	Orb.GhostOffsets = {}
+	Orb.GhostTargets = {}
 
+	local orbs = CollectionService:GetTagged(Config.ObjectTag)
 	for _, orb in ipairs(orbs) do
 		Orb.InitOrb(orb)
 	end
@@ -40,21 +43,25 @@ function Orb.Init()
 
 	OrbSpeakerMovedRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		if not plr.Character then return end
-		local playerPos = plr.Character.HumanoidRootPart.Position
+		local playerPos = plr.Character.PrimaryPart.Position
 
 		local waypointPos = Orb.TweenOrbToNearPosition(orb, playerPos)
 
 		if waypointPos then
-			Orb.WalkGhosts(orb, waypointPos)
+			if (waypointPos - orb.Position).Magnitude > 0.01 then
+				Orb.WalkGhosts(orb, waypointPos)
+			else
+				Orb.RotateGhosts(orb)
+			end
 		end
 	end)
 
 	-- Handle teleports
 	OrbTeleportRemoteEvent.OnServerEvent:Connect(function(plr, orb)
-		local ghostCFrame = Orb.GetGhost(orb, plr.UserId).HumanoidRootPart.CFrame
+		local ghostCFrame = Orb.GetGhost(orb, plr.UserId).PrimaryPart.CFrame
 		Orb.RemoveGhost(orb, plr.UserId)
 		wait(0.1)
-		plr.Character.HumanoidRootPart.CFrame = ghostCFrame
+		plr.Character.PrimaryPart.CFrame = ghostCFrame
 	end)
 
 	-- Remove leaving players as listeners
@@ -119,48 +126,78 @@ function Orb.InitOrb(orb)
 	end
 end
 
+function Orb.RotateGhostToFaceSpeaker(orb, ghost)
+	if not ghost then return end
+
+	local speakerPos = Orb.GetSpeakerPosition(orb)
+	if not speakerPos then return end
+
+	local ghostPos = ghost.PrimaryPart.Position
+	local speakerPosXZ = Vector3.new(speakerPos.X,ghostPos.Y,speakerPos.Z)
+
+	local tweenInfo = TweenInfo.new(
+		0.5, -- Time
+		Enum.EasingStyle.Linear, -- EasingStyle
+		Enum.EasingDirection.Out, -- EasingDirection
+		0, -- RepeatCount (when less than zero the tween will loop indefinitely)
+		false, -- Reverses (tween will reverse once reaching it's goal)
+		0 -- DelayTime
+	)
+
+	local ghostTween = TweenService:Create(ghost.PrimaryPart, tweenInfo, 
+		{CFrame = CFrame.new(ghostPos,speakerPosXZ)})
+	
+	ghostTween:Play()
+end
+
+function Orb.RotateGhosts(orb)
+	for _, ghost in ipairs(orb.Ghosts:GetChildren()) do
+		Orb.RotateGhostToFaceSpeaker(orb, ghost)
+	end
+end
+
 function Orb.WalkGhosts(orb, pos)
 	-- Animate all the ghosts
 	for _, ghost in ipairs(orb.Ghosts:GetChildren()) do
 		-- Maintain relative positioning
-		local newPos = pos - orb.Position + ghost.PrimaryPart.Position
-		ghost.Humanoid:MoveTo(newPos)
+		local offset = Orb.GhostOffsets[ghost.Name]
+		local newPos
 
-		local animator = ghost.Humanoid:FindFirstChild("Animator")
-		local animation = animator:LoadAnimation(Common.WalkAnim)
-		animation:Play()
+		if offset ~= nil then
+			newPos = pos + offset
+		else
+			newPos = pos - orb.Position + ghost.PrimaryPart.Position
+		end
+		
+		-- If we're already on our way, don't repeat it
+		local alreadyMoving = (Orb.GhostTargets[ghost.Name] ~= nil) and (Orb.GhostTargets[ghost.Name] - newPos).Magnitude < 0.01
 
-		ghost.Humanoid.MoveToFinished:Connect(function(reached)
-			animation:Stop()
+		if not alreadyMoving then
+			ghost.Humanoid:MoveTo(newPos)
 
-			-- Face towards the speaker
-			local speakerPos = Orb.GetSpeakerPosition(orb)
-			if speakerPos then
-				local ghostPos = ghost.PrimaryPart.Position
-				local speakerPosXZ = Vector3.new(speakerPos.X,ghostPos.Y,speakerPos.Z)
+			Orb.GhostTargets[ghost.Name] = newPos
 
-				local tweenInfo = TweenInfo.new(
-					0.5, -- Time
-					Enum.EasingStyle.Linear, -- EasingStyle
-					Enum.EasingDirection.Out, -- EasingDirection
-					0, -- RepeatCount (when less than zero the tween will loop indefinitely)
-					false, -- Reverses (tween will reverse once reaching it's goal)
-					0 -- DelayTime
-				)
-			
-				local ghostTween = TweenService:Create(ghost.PrimaryPart, tweenInfo, 
-					{CFrame = CFrame.new(ghostPos,speakerPosXZ)})
-				
-				
-				ghostTween:Play()
-			end
-		end)
+			local animator = ghost.Humanoid:FindFirstChild("Animator")
+			local animation = animator:LoadAnimation(Common.WalkAnim)
+			animation:Play()
+
+			local connection
+			connection = ghost.Humanoid.MoveToFinished:Connect(function(reached)
+				animation:Stop()
+				Orb.GhostTargets[ghost.Name] = nil
+
+				connection:Disconnect()
+				connection = nil
+
+				Orb.RotateGhostToFaceSpeaker(orb, ghost)
+			end)
+		end
 	end
 end
 
 function Orb.TweenOrbToNearPosition(orb, pos)
 	local waypointsFolder = orb:FindFirstChild("Waypoints")
-	if not waypointsFolder then return end
+	if not waypointsFolder then return orb.Position end
 
 	-- Find the closest waypoint to the new position
 	-- and move the orb there
@@ -179,6 +216,11 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 		end
 
 		if minWaypoint then
+			-- If we are already there, don't tween
+			if minWaypoint.Position == orb.Position then
+				return minWaypoint.Position
+			end
+
 			local tweenInfo = TweenInfo.new(
 				3, -- Time
 				Enum.EasingStyle.Quad, -- EasingStyle
@@ -199,7 +241,7 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 		end
 	end
 
-	return nil
+	return orb.Position
 end
 
 function Orb.AddGhost(orb, playerId)
@@ -214,6 +256,9 @@ function Orb.AddGhost(orb, playerId)
 		local distanceOrbPlayer = (orb.Position - character.PrimaryPart.Position).Magnitude
 		local ghostPos = ghost.PrimaryPart.Position - distanceOrbPlayer * ghost.PrimaryPart.CFrame.LookVector
 
+		-- This offset is preserved when walking ghosts
+		Orb.GhostOffsets[ghost.Name] = ghostPos - orb.Position
+
 		-- Make the ghost look towards the speaker, if there is one
 		local speakerPos = Orb.GetSpeakerPosition(orb)
 		if speakerPos then
@@ -226,7 +271,6 @@ function Orb.AddGhost(orb, playerId)
 		for _, desc in ipairs(ghost:GetDescendants()) do
 			if desc:IsA("BasePart") then
 				desc.Transparency = 1 - (0.2 * (1 - desc.Transparency))
-				desc.CanCollide = false
 				desc.CastShadow = false
 			end
 		end

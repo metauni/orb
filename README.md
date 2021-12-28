@@ -17,8 +17,3 @@ Lowering this activation energy seems important, and is the main purpose of the 
 ## Implementation
 
 Just as metaboards are parts in the world tagged with `metaboard`, an orb is a part tagged `metaorb`.
-
-TODO:
-
-- Orb looks at nearest board
-- Listeners have viewport view of board
