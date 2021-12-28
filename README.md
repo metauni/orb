@@ -14,6 +14,6 @@ In this scenario the ability to wander off in listener mode **lowers the activat
 
 Lowering this activation energy seems important, and is the main purpose of the Orbs.
 
-## Implementation
+## Installation
 
-Just as metaboards are parts in the world tagged with `metaboard`, an orb is a part tagged `metaorb`.
+Download the release, drag the `metaorb.rbxmx` file into `ServerScriptService` and then tag the objects you wish to play the role of orbs with the tag `metaorb`.
