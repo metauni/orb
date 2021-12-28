@@ -184,12 +184,18 @@ function Orb.WalkGhosts(orb, pos)
 			local connection
 			connection = ghost.Humanoid.MoveToFinished:Connect(function(reached)
 				animation:Stop()
-				Orb.GhostTargets[ghost.Name] = nil
 
+				-- If it was too far for the ghost to reach, just teleport them
+				if not reached then
+					local speakerPos = Orb.GetSpeakerPosition(orb)
+					ghost.PrimaryPart.CFrame = CFrame.new(newPos, speakerPos)
+				else
+					Orb.RotateGhostToFaceSpeaker(orb, ghost)
+				end
+
+				Orb.GhostTargets[ghost.Name] = nil
 				connection:Disconnect()
 				connection = nil
-
-				Orb.RotateGhostToFaceSpeaker(orb, ghost)
 			end)
 		end
 	end
