@@ -20,7 +20,7 @@ Gui.__index = Gui
 
 function Gui.Init()
     localPlayer = Players.LocalPlayer
-    listenerGui = localPlayer.PlayerGui.OrbListenerGui
+    listenerGui = localPlayer.PlayerGui.OrbGui
     Gui.Listening = false
     Gui.Speaking = false
     Gui.Orb = nil
