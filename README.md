@@ -20,15 +20,5 @@ Just as metaboards are parts in the world tagged with `metaboard`, an orb is a p
 
 TODO:
 
-- Create ghost near orb on attach
-- Destroy ghost on detach
-- Attach as speaker to orb (no permissions) (proximity)
-- Speaker can see the ghost orb
-- Detach as speaker to orb (in GUI)
-- When attached as speaker, orb follows you (straight track)
-- Check that listeners hear from new orb position?
-- Listener ghosts follow moving orb
-- Orb follows you (spline track)
 - Orb looks at nearest board
 - Listeners have viewport view of board
-- Warn to detach as speaker if you walk too far away (in GUI)

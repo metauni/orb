@@ -16,6 +16,10 @@
 		{
 			"Name": "OrbSpeakerMoved",
 			"ClassName": "RemoteEvent"
+		},
+		{
+			"Name": "OrbTeleport",
+			"ClassName": "RemoteEvent"
 		}
 	]
 }

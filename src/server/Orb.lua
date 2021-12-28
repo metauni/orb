@@ -1,6 +1,7 @@
 local CollectionService = game:GetService("CollectionService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
 
 local Common = game:GetService("ReplicatedStorage").OrbCommon
 local Config = require(Common.Config)
@@ -9,6 +10,7 @@ local OrbAttachRemoteEvent = Common.Remotes.OrbAttach
 local OrbDetachRemoteEvent = Common.Remotes.OrbDetach
 local OrbBecomeSpeakerRemoteEvent = Common.Remotes.OrbBecomeSpeaker
 local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
+local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
 
 local Orb = {}
 Orb.__index = Orb
@@ -37,47 +39,27 @@ function Orb.Init()
 	end)
 
 	OrbSpeakerMovedRemoteEvent.OnServerEvent:Connect(function(plr, orb)
-		local waypointsFolder = orb:FindFirstChild("Waypoints")
-
 		if not plr.Character then return end
-		if not waypointsFolder then return end
-
 		local playerPos = plr.Character.HumanoidRootPart.Position
 
-		-- Find the closest waypoint to the new speaker position
-		-- and move the orb there
-		local minDistance = math.huge
-		local minWaypoint = nil
+		local waypointPos = Orb.TweenOrbToNearPosition(orb, playerPos)
 
-		if waypointsFolder then
-			local waypoints = waypointsFolder:GetChildren()
-
-			for _, waypoint in ipairs(waypoints) do
-				local distance = (waypoint.Position - playerPos).Magnitude
-				if distance < minDistance then
-					minDistance = distance
-					minWaypoint = waypoint
-				end
-			end
-
-			if minWaypoint then
-				local tweenInfo = TweenInfo.new(
-					3, -- Time
-					Enum.EasingStyle.Quad, -- EasingStyle
-					Enum.EasingDirection.Out, -- EasingDirection
-					0, -- RepeatCount (when less than zero the tween will loop indefinitely)
-					false, -- Reverses (tween will reverse once reaching it's goal)
-					0 -- DelayTime
-				)
-			
-				local orbTween = TweenService:Create(orb, tweenInfo, 
-					{Position = minWaypoint.Position})
-				
-				-- Note that if the position is already being tweened, this will
-				-- stop that tween and commence this one
-				orbTween:Play()
-			end
+		if waypointPos then
+			Orb.WalkGhosts(orb, waypointPos)
 		end
+	end)
+
+	-- Handle teleports
+	OrbTeleportRemoteEvent.OnServerEvent:Connect(function(plr, orb)
+		local ghostCFrame = Orb.GetGhost(orb, plr.UserId).HumanoidRootPart.CFrame
+		Orb.RemoveGhost(orb, plr.UserId)
+		wait(0.1)
+		plr.Character.HumanoidRootPart.CFrame = ghostCFrame
+	end)
+
+	-- Remove leaving players as listeners
+	Players.PlayerRemoving:Connect(function(plr)
+		Orb.RemoveListenerFromAllOrbs(plr.UserId)
 	end)
 
 	print("Orb Server initialized")
@@ -101,10 +83,19 @@ function Orb.InitOrb(orb)
 		speaker.Parent = orb
 	end
 
+	-- Add ghosts folder
+	local ghosts = orb:FindFirstChild("Ghosts")
+
+	if ghosts == nil then
+		ghosts = Instance.new("Folder")
+		ghosts.Name = "Ghosts"
+		ghosts.Parent = orb
+	end
+
 	-- Attach proximity prompts
 	local proximityPrompt = Instance.new("ProximityPrompt")
 	proximityPrompt.ActionText = "Attach"
-	proximityPrompt.MaxActivationDistance = 7
+	proximityPrompt.MaxActivationDistance = 8
 	proximityPrompt.HoldDuration = 1
 	proximityPrompt.ObjectText = "Orb"
 	proximityPrompt.Parent = orb
@@ -128,7 +119,132 @@ function Orb.InitOrb(orb)
 	end
 end
 
--- TODO: Disconnect a listener when the player quits
+function Orb.WalkGhosts(orb, pos)
+	-- Animate all the ghosts
+	for _, ghost in ipairs(orb.Ghosts:GetChildren()) do
+		-- Maintain relative positioning
+		local newPos = pos - orb.Position + ghost.PrimaryPart.Position
+		ghost.Humanoid:MoveTo(newPos)
+
+		local animator = ghost.Humanoid:FindFirstChild("Animator")
+		local animation = animator:LoadAnimation(Common.WalkAnim)
+		animation:Play()
+
+		ghost.Humanoid.MoveToFinished:Connect(function(reached)
+			animation:Stop()
+
+			-- Face towards the speaker
+			local speakerPos = Orb.GetSpeakerPosition(orb)
+			if speakerPos then
+				local ghostPos = ghost.PrimaryPart.Position
+				local speakerPosXZ = Vector3.new(speakerPos.X,ghostPos.Y,speakerPos.Z)
+
+				local tweenInfo = TweenInfo.new(
+					0.5, -- Time
+					Enum.EasingStyle.Linear, -- EasingStyle
+					Enum.EasingDirection.Out, -- EasingDirection
+					0, -- RepeatCount (when less than zero the tween will loop indefinitely)
+					false, -- Reverses (tween will reverse once reaching it's goal)
+					0 -- DelayTime
+				)
+			
+				local ghostTween = TweenService:Create(ghost.PrimaryPart, tweenInfo, 
+					{CFrame = CFrame.new(ghostPos,speakerPosXZ)})
+				
+				
+				ghostTween:Play()
+			end
+		end)
+	end
+end
+
+function Orb.TweenOrbToNearPosition(orb, pos)
+	local waypointsFolder = orb:FindFirstChild("Waypoints")
+	if not waypointsFolder then return end
+
+	-- Find the closest waypoint to the new position
+	-- and move the orb there
+	local minDistance = math.huge
+	local minWaypoint = nil
+
+	if waypointsFolder then
+		local waypoints = waypointsFolder:GetChildren()
+
+		for _, waypoint in ipairs(waypoints) do
+			local distance = (waypoint.Position - pos).Magnitude
+			if distance < minDistance then
+				minDistance = distance
+				minWaypoint = waypoint
+			end
+		end
+
+		if minWaypoint then
+			local tweenInfo = TweenInfo.new(
+				3, -- Time
+				Enum.EasingStyle.Quad, -- EasingStyle
+				Enum.EasingDirection.Out, -- EasingDirection
+				0, -- RepeatCount (when less than zero the tween will loop indefinitely)
+				false, -- Reverses (tween will reverse once reaching it's goal)
+				0 -- DelayTime
+			)
+		
+			local orbTween = TweenService:Create(orb, tweenInfo, 
+				{Position = minWaypoint.Position})
+			
+			-- Note that if the position is already being tweened, this will
+			-- stop that tween and commence this one
+			orbTween:Play()
+
+			return minWaypoint.Position
+		end
+	end
+
+	return nil
+end
+
+function Orb.AddGhost(orb, playerId)
+	local plr = Players:GetPlayerByUserId(playerId)
+	if plr then
+		local character = plr.Character
+		character.Archivable = true
+		local ghost = plr.Character:Clone()
+		character.Archivable = false
+
+		ghost.Name = tostring(playerId)
+		local distanceOrbPlayer = (orb.Position - character.PrimaryPart.Position).Magnitude
+		local ghostPos = ghost.PrimaryPart.Position - distanceOrbPlayer * ghost.PrimaryPart.CFrame.LookVector
+
+		-- Make the ghost look towards the speaker, if there is one
+		local speakerPos = Orb.GetSpeakerPosition(orb)
+		if speakerPos then
+			local speakerPosXZ = Vector3.new(speakerPos.X,ghostPos.Y,speakerPos.Z)
+			ghost:SetPrimaryPartCFrame(CFrame.new(ghostPos,speakerPosXZ))
+		else
+			ghost:SetPrimaryPartCFrame(CFrame.new(ghostPos, character.PrimaryPart.Position))
+		end
+
+		for _, desc in ipairs(ghost:GetDescendants()) do
+			if desc:IsA("BasePart") then
+				desc.Transparency = 1 - (0.2 * (1 - desc.Transparency))
+				desc.CanCollide = false
+				desc.CastShadow = false
+			end
+		end
+
+		ghost.Parent = orb.Ghosts
+	end
+end
+
+function Orb.GetGhost(orb, playerId)
+	for _, ghost in ipairs(orb.Ghosts:GetChildren()) do
+		if ghost.Name == tostring(playerId) then
+			return ghost
+		end
+	end
+
+	return nil
+end
+
 function Orb.AddListener(orb, listenerID)
 	for _, listenerValue in ipairs(orb.Listeners:GetChildren()) do
 		if listenerValue.Value == listenerID then return end
@@ -138,6 +254,17 @@ function Orb.AddListener(orb, listenerID)
 	newListenerValue.Name = "ListenerValue"
 	newListenerValue.Value = listenerID
 	newListenerValue.Parent = orb.Listeners
+
+	Orb.AddGhost(orb, listenerID)
+end
+
+function Orb.RemoveGhost(orb, playerId)
+	for _, ghost in ipairs(orb.Ghosts:GetChildren()) do
+		if ghost.Name == tostring(playerId) then
+			ghost:Destroy()
+			break
+		end
+	end
 end
 
 function Orb.RemoveListener(orb, listenerID)
@@ -146,6 +273,16 @@ function Orb.RemoveListener(orb, listenerID)
 			listenerValue:Destroy()
 			break
 		end
+	end
+
+	Orb.RemoveGhost(orb, listenerID)
+end
+
+function Orb.RemoveListenerFromAllOrbs(listenerID)
+	local orbs = CollectionService:GetTagged(Config.ObjectTag)
+
+	for _, orb in ipairs(orbs) do
+		Orb.RemoveListener(orb, listenerID)
 	end
 end
 
@@ -156,6 +293,15 @@ function Orb.SetSpeaker(orb, speaker)
 		-- Set speaker to nil to disconnect a speaker
 		orb.Speaker.Value = 0
 	end
+end
+
+function Orb.GetSpeakerPosition(orb)
+	if orb.Speaker.Value == 0 then return nil end
+
+	local plr = Players:GetPlayerByUserId(orb.Speaker.Value)
+	if not plr then return nil end
+
+	return plr.Character.PrimaryPart.Position
 end
 
 return Orb
