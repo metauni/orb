@@ -1,12 +1,24 @@
 # Orb system
 
-Orbs are listening devices, often located near metaboards, that people can attach themselves to as listeners so that they continue to hear a talk while elsewhere in the world. They also serve as recording devices for audio and video.
+Orbs are audiovisual devices with the following features:
 
-There is an [introductory video](https://youtu.be/0vuNKcCv1sk).
+* Any user can attach to an *orb* as a *listener* and hear whatever audio the orb hears.
+
+* Users with the right permission can attach to an orb as a *speaker*. The orb will then follow the speaker using *waypoints*.
+
+* Orbs are the basis of the automated recording system in metauni. When an orb is at a waypoint it will orient itself towards the nearest *point of interest* and this is used by the camera system to record audio and video (for example of talks).
+
+There is an [introductory video](https://youtu.be/0vuNKcCv1sk). In more detail
+
+* An *orb* is any part with the tag `metaorb`
+* A *waypoint* is any part with the tag `metaorb_waypoint`
+* A *point of interest* is any part with the tag `metaorb_poi` or `metaboard`.
+
+A typical example: waypoints are located in front of metaboards, and an orb follows a speaker from board to board.
 
 ## Installation
 
-Download the release, drag the `metaorb.rbxmx` file into `ServerScriptService` and then tag the objects you wish to play the role of orbs with the tag `metaorb`. Parented to that object is optionally a folder `Waypoints` which contains the points that the orb will move to as the speaker moves. The releases contain some demonstration objects with the necessary tag, and waypoints.
+Download the release, drag the `metaorb.rbxmx` file into `ServerScriptService` and then tag the objects you wish to play the role of orbs with the tag `metaorb`. Optionally tag some parts (usually invisible) with the tag `metaorb_waypoint` and `metaorb_poi`.
 
 Some notes:
 
@@ -14,7 +26,7 @@ Some notes:
 
 * By default anybody can attach themselves as a speaker to any orb. If you have the metauni [Admin Commands](https://github.com/metauni/admin) installed, then only users with the scribe permission will be able to attach themselves as a speaker to an orb.
 
-* If the Proximity Prompts don't appear when you are near the orb, try moving it further out of the ground (the prompts will not appear unless there is a line of sight to the position of the Orb).
+* If the Proximity Prompts don't appear when you are near the orb, try moving it further out of the ground (the prompts will not appear unless there is a line of sight to the position of the orb).
 
 ## Usage
 
