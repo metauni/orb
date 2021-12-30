@@ -2,9 +2,7 @@
 
 Orbs are listening devices, often located near metaboards, that people can attach themselves to as listeners so that they continue to hear a talk while elsewhere in the world. They also serve as recording devices for audio and video.
 
-You can access the public [test server](https://www.roblox.com/games/8369549984/Orb-test) and watch some videos:
-
-- [Initial implementation](https://youtu.be/0vuNKcCv1sk).
+There is an [introductory video](https://youtu.be/0vuNKcCv1sk).
 
 ## Installation
 
@@ -15,6 +13,8 @@ Some notes:
 * You should make the terrain near your waypoints as flat and open as possible, so that ghosts are not spawned into terrain and they don't have difficulty traversing the landscape.
 
 * By default anybody can attach themselves as a speaker to any orb. If you have the metauni [Admin Commands](https://github.com/metauni/admin) installed, then only users with the scribe permission will be able to attach themselves as a speaker to an orb.
+
+* If the Proximity Prompts don't appear when you are near the orb, try moving it further out of the ground (the prompts will not appear unless there is a line of sight to the position of the Orb).
 
 ## Usage
 

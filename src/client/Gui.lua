@@ -1,6 +1,7 @@
 local Common = game:GetService("ReplicatedStorage").OrbCommon
 local SoundService = game:GetService("SoundService")
 local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local Players = game:GetService("Players")
@@ -13,7 +14,7 @@ local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
 local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
 
 local listenerGui, speakerGui, listenButton, detachButton, teleportButton
-local viewportFrame, boardButton, detachSpeakerButton
+local viewportFrame, boardButton, detachSpeakerButton, speakerViewportFrame
 local localPlayer
 
 local Gui = {}
@@ -36,6 +37,7 @@ function Gui.Init()
     teleportButton = listenerGui.TeleportButton
     boardButton = listenerGui.BoardButton
     viewportFrame = listenerGui.ViewportFrame
+    speakerViewportFrame = speakerGui.ViewportFrame
     
     -- Disable the viewport frame if there are no boards
     local boards = CollectionService:GetTagged("metaboard")
@@ -108,6 +110,11 @@ function Gui.Init()
 		end)
 	end
 
+    -- Give speaker permissions in Studio
+    if RunService:IsStudio() then
+        Gui.HasSpeakerPermission = true
+    end
+
     -- Install proximity prompts
     local orbs = CollectionService:GetTagged(Config.ObjectTag)
     for _, orb in ipairs(orbs) do
@@ -148,6 +155,12 @@ function Gui.Init()
             end
         end)
     end
+
+    -- Setup a camera on the speaker viewport frame
+    local viewportCamera = Instance.new("Camera")
+    viewportCamera.Name = "Camera"
+	speakerViewportFrame.CurrentCamera = viewportCamera
+	viewportCamera.Parent = speakerViewportFrame
 
 	print("[Orb] Gui Initialised")
 end
@@ -240,6 +253,26 @@ function Gui.Detach()
     Gui.Orb = nil
 end
 
+function Gui.PopulateViewportSpeaker()
+    local oldOrb = speakerViewportFrame:FindFirstChild("Orb")
+    if oldOrb then oldOrb:Destroy() end
+    if not Gui.Orb then return end
+
+    local orbClone = Gui.Orb:Clone()
+
+    -- Remove tags
+    for _, tag in ipairs(CollectionService:GetTags(orbClone)) do
+        CollectionService:RemoveTag(orbClone, tag)
+    end
+
+    orbClone:ClearAllChildren()
+
+    orbClone.Position = Vector3.new(0,0,0)
+    orbClone.Name = "Orb"
+    orbClone.Parent = speakerViewportFrame
+    speakerViewportFrame.Camera.CFrame = CFrame.new(orbClone.Position + Vector3.new(0, 1.3 * orbClone.Size.Y, 0), orbClone.Position)
+end
+
 function Gui.AttachSpeaker(orb)
     -- Disable the proximity prompt
     orb.NormalPrompt.Enabled = false
@@ -248,9 +281,12 @@ function Gui.AttachSpeaker(orb)
     -- Disconnect from the old source if there is one
     if Gui.Orb then Gui.Detach() end
     
-    speakerGui.Enabled = true
     Gui.Orb = orb
     Gui.Speaking = true
+
+    -- Setup the viewport to show a copy of the orb
+    Gui.PopulateViewportSpeaker()
+    speakerGui.Enabled = true
 
     -- This event fires when the running speed changes
     local humanoid = localPlayer.Character:WaitForChild("Humanoid")
