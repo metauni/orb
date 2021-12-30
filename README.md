@@ -19,3 +19,17 @@ Lowering this activation energy seems important, and is the main purpose of the 
 Download the release, drag the `metaorb.rbxmx` file into `ServerScriptService` and then tag the objects you wish to play the role of orbs with the tag `metaorb`. Parented to that object is optionally a folder `Waypoints` which contains the points that the orb will move to as the speaker moves.
 
 You should make the terrain near your waypoints as flat and open as possible, so that ghosts are not spawned into terrain and they don't have difficulty traversing the landscape.
+
+## Generating a Release
+
+The `metaorb.rbxmx` file is generated like this
+```bash
+rojo build --output "build.rbxlx"
+remodel run orb_packager.lua
+```
+
+The first command builds a place file according to `default.project.json`.
+The second command uses [remodel](https://github.com/rojo-rbx/remodel) to extract all of the components of the Orb system,
+and packages them all within the `MetaBoardServer` folder, and exports this 
+as a `metaorb.rbxmx` file. The startup server script then redistributes these
+components on world boot.
