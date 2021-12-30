@@ -1,18 +1,19 @@
 local Common = game:GetService("ReplicatedStorage").OrbCommon
 local SoundService = game:GetService("SoundService")
 local CollectionService = game:GetService("CollectionService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local Players = game:GetService("Players")
 local Config = require(Common.Config)
 
 local OrbAttachRemoteEvent = Common.Remotes.OrbAttach
 local OrbDetachRemoteEvent = Common.Remotes.OrbDetach
-local OrbBecomeSpeakerRemoteEvent = Common.Remotes.OrbBecomeSpeaker
+local OrbAttachSpeakerRemoteEvent = Common.Remotes.OrbAttachSpeaker
 local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
 local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
 
-local listenerGui, listenButton, detachButton, speakerButton, teleportButton
-local viewportFrame, boardButton
+local listenerGui, speakerGui, listenButton, detachButton, teleportButton
+local viewportFrame, boardButton, detachSpeakerButton
 local localPlayer
 
 local Gui = {}
@@ -21,15 +22,17 @@ Gui.__index = Gui
 function Gui.Init()
     localPlayer = Players.LocalPlayer
     listenerGui = localPlayer.PlayerGui.OrbGui
+    speakerGui = localPlayer.PlayerGui.OrbGuiSpeaker
     Gui.Listening = false
     Gui.Speaking = false
     Gui.Orb = nil
     Gui.RunningConnection = nil
     Gui.ViewportOn = false
+    Gui.HasSpeakerPermission = true -- can attach as speaker?
 
     listenButton = listenerGui.ListenButton
     detachButton = listenerGui.DetachButton
-    speakerButton = listenerGui.SpeakerButton
+    detachSpeakerButton = speakerGui.DetachButton
     teleportButton = listenerGui.TeleportButton
     boardButton = listenerGui.BoardButton
     viewportFrame = listenerGui.ViewportFrame
@@ -38,7 +41,6 @@ function Gui.Init()
     local boards = CollectionService:GetTagged("metaboard")
     if #boards == 0 then
         boardButton.Visible = false
-        speakerButton.Position += UDim2.new(0,0,0,-45)
     end
 
     -- 
@@ -55,26 +57,14 @@ function Gui.Init()
 
     listenButton.Activated:Connect(toggleListen)
 
-    --
-    -- Speaking
-    --
-
-    local function toggleSpeaker()
-        if Gui.Speaking then
-            Gui.SpeakerOff()
-        else
-            Gui.SpeakerOn()
-        end
-    end
-
-    speakerButton.Activated:Connect(toggleSpeaker)
-
     -- 
     -- Attach and detach
     --
 
     detachButton.Activated:Connect(Gui.Detach)
+    detachSpeakerButton.Activated:Connect(Gui.Detach)
     OrbAttachRemoteEvent.OnClientEvent:Connect(Gui.Attach)
+    OrbAttachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.AttachSpeaker)
 
     -- 
     -- Teleporting
@@ -98,7 +88,68 @@ function Gui.Init()
 	    viewportFrame.Visible = Gui.ViewportOn
     end)
 
-	print("Orb Gui Initialised")
+    -- If the Admin system is installed, the permission specified there
+	-- overwrites the default "true" state of HasWritePermission
+	local adminEvents = game:GetService("ReplicatedStorage"):FindFirstChild("MetaAdmin")
+	if adminEvents then
+		local isScribeRF = adminEvents:FindFirstChild("IsScribe")
+
+		if isScribeRF then
+			Gui.HasSpeakerPermission = isScribeRF:InvokeServer()
+		end
+
+		-- Listen for updates to the permissions
+		local permissionUpdateRE = adminEvents:FindFirstChild("PermissionsUpdate")
+		permissionUpdateRE.OnClientEvent:Connect(function()
+			-- Request the new permission
+			if isScribeRF then
+				Gui.HasSpeakerPermission = isScribeRF:InvokeServer()
+			end
+		end)
+	end
+
+    -- Install proximity prompts
+    local orbs = CollectionService:GetTagged(Config.ObjectTag)
+    for _, orb in ipairs(orbs) do
+        -- Attach proximity prompts
+        local proximityPrompt = Instance.new("ProximityPrompt")
+        proximityPrompt.Name = "NormalPrompt"
+        proximityPrompt.ActionText = "Attach"
+        proximityPrompt.MaxActivationDistance = 8
+        proximityPrompt.HoldDuration = 1
+        proximityPrompt.ObjectText = "Orb"
+        proximityPrompt.Parent = orb
+
+        -- Attach speaker prompts
+        local speakerPrompt = Instance.new("ProximityPrompt")
+        speakerPrompt.Name = "SpeakerPrompt"
+        speakerPrompt.ActionText = "Attach as Speaker"
+        speakerPrompt.UIOffset = Vector2.new(0,75)
+        speakerPrompt.MaxActivationDistance = 8
+        speakerPrompt.HoldDuration = 1
+        speakerPrompt.KeyboardKeyCode = Enum.KeyCode.F
+        speakerPrompt.GamepadKeyCode = Enum.KeyCode.ButtonY
+        speakerPrompt.ObjectText = "Orb"
+        speakerPrompt.Enabled = Gui.HasSpeakerPermission
+        speakerPrompt.Parent = orb
+
+        ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
+            if prompt.Parent == orb and prompt.Name == "NormalPrompt" then
+                OrbAttachRemoteEvent:FireServer(orb)
+                Gui.Attach(orb)
+            end
+
+            if prompt.Parent == orb and prompt.Name == "SpeakerPrompt" then
+                -- Only allow someone to attach if there is no current speaker
+                if orb.Speaker.Value == 0 then
+                    OrbAttachSpeakerRemoteEvent:FireServer(orb)
+                    Gui.AttachSpeaker(orb)
+                end
+            end
+        end)
+    end
+
+	print("[Orb] Gui Initialised")
 end
 
 function Gui.PopulateViewport()
@@ -144,44 +195,10 @@ function Gui.PopulateViewport()
 	viewportCamera.CFrame = CFrame.new( orbCameraPos, closestBoard.Position )
 end
 
-function Gui.SpeakerOn()
-    Gui.Speaking = true
-    speakerButton.BackgroundColor3 = Color3.new(0, 0.920562, 0.199832)
-    --speakerButton.BackgroundTransparency = 0.2
-
-    if Gui.Orb then
-        OrbBecomeSpeakerRemoteEvent:FireServer(Gui.Orb, "on")
-    end
-
-    -- This event fires when the running speed changes
-    local humanoid = localPlayer.Character:WaitForChild("Humanoid")
-    Gui.RunningConnection = humanoid.Running:Connect(function(speed)
-        if speed == 0 then
-            -- They were moving and then stood still
-            OrbSpeakerMovedRemoteEvent:FireServer(Gui.Orb)
-        end
-    end)
-end
-
-function Gui.SpeakerOff()
-    Gui.Speaking = false
-    speakerButton.BackgroundColor3 = Color3.new(0,0,0)
-    --speakerButton.BackgroundTransparency = 0.75
-
-    if Gui.Orb then
-        OrbBecomeSpeakerRemoteEvent:FireServer(Gui.Orb, "off")
-    end
-
-    if Gui.RunningConnection then
-        Gui.RunningConnection:Disconnect()
-        Gui.RunningConnection = nil
-    end
-end
-
 function Gui.ListenOn()
     Gui.Listening = true
     listenButton.BackgroundColor3 = Color3.new(0, 0.920562, 0.199832)
-    --listenButton.BackgroundTransparency = 0.2
+    listenButton.BackgroundTransparency = 0.2
 
     if Gui.Orb then
         -- Enum.ListenerType.ObjectPosition (if player rotates camera, it changes angle of sound sources)
@@ -193,32 +210,68 @@ end
 function Gui.ListenOff()
     Gui.Listening = false
     listenButton.BackgroundColor3 = Color3.new(0,0,0)
-    --listenButton.BackgroundTransparency = 0.75
+    listenButton.BackgroundTransparency = 0.75
 
     if Gui.Orb then
         SoundService:SetListener(Enum.ListenerType.Camera)
     end
 end
 
+-- Detach, as listener or speaker
 function Gui.Detach()
-    Gui.Orb.ProximityPrompt.Enabled = true
+    if not Gui.Orb then return end
+
+    Gui.Orb.NormalPrompt.Enabled = true
+    if Gui.HasSpeakerPermission then
+        Gui.Orb.SpeakerPrompt.Enabled = true
+    end
+
     Gui.ListenOff()
-    Gui.SpeakerOff()
+    Gui.Speaking = false
     listenerGui.Enabled = false
+    speakerGui.Enabled = false
+
+    if Gui.RunningConnection then
+        Gui.RunningConnection:Disconnect()
+        Gui.RunningConnection = nil
+    end
 
     OrbDetachRemoteEvent:FireServer(Gui.Orb)
     Gui.Orb = nil
 end
 
+function Gui.AttachSpeaker(orb)
+    -- Disable the proximity prompt
+    orb.NormalPrompt.Enabled = false
+    orb.SpeakerPrompt.Enabled = false
+    
+    -- Disconnect from the old source if there is one
+    if Gui.Orb then Gui.Detach() end
+    
+    speakerGui.Enabled = true
+    Gui.Orb = orb
+    Gui.Speaking = true
+
+    -- This event fires when the running speed changes
+    local humanoid = localPlayer.Character:WaitForChild("Humanoid")
+    Gui.RunningConnection = humanoid.Running:Connect(function(speed)
+        if speed == 0 then
+            -- They were moving and then stood still
+            OrbSpeakerMovedRemoteEvent:FireServer(Gui.Orb)
+        end
+    end)
+end
+
 function Gui.Attach(orb)
+    -- Disable the proximity prompt
+    orb.NormalPrompt.Enabled = false
+    orb.SpeakerPrompt.Enabled = false
+
     -- Disconnect from the old source if there is one
     if Gui.Orb then Gui.Detach() end
     
     listenerGui.Enabled = true
     Gui.Orb = orb
-
-    -- Disable the proximity prompt
-    orb.ProximityPrompt.Enabled = false
 end
 
 return Gui

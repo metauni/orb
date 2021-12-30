@@ -1,5 +1,4 @@
 local CollectionService = game:GetService("CollectionService")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 
@@ -8,7 +7,7 @@ local Config = require(Common.Config)
 
 local OrbAttachRemoteEvent = Common.Remotes.OrbAttach
 local OrbDetachRemoteEvent = Common.Remotes.OrbDetach
-local OrbBecomeSpeakerRemoteEvent = Common.Remotes.OrbBecomeSpeaker
+local OrbAttachSpeakerRemoteEvent = Common.Remotes.OrbAttachSpeaker
 local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
 local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
 
@@ -31,14 +30,20 @@ function Orb.Init()
 
 	OrbDetachRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		Orb.RemoveListener(orb, plr.UserId)
-	end)
 
-	OrbBecomeSpeakerRemoteEvent.OnServerEvent:Connect(function(plr, orb, state)
-		if plr and orb and state == "on" then
-			Orb.SetSpeaker(orb, plr.UserId)
-		else
+		-- If this user was the speaker, detaching means
+		-- they detached from being the speaker
+		if orb.Speaker.Value == plr.UserId then
 			Orb.SetSpeaker(orb, nil)
 		end
+	end)
+
+	OrbAttachRemoteEvent.OnServerEvent:Connect(function(plr, orb)
+		Orb.AddListener(orb, plr.UserId)
+	end)
+
+	OrbAttachSpeakerRemoteEvent.OnServerEvent:Connect(function(plr, orb)
+		Orb.SetSpeaker(orb, plr.UserId)
 	end)
 
 	OrbSpeakerMovedRemoteEvent.OnServerEvent:Connect(function(plr, orb)
@@ -69,7 +74,7 @@ function Orb.Init()
 		Orb.RemoveListenerFromAllOrbs(plr.UserId)
 	end)
 
-	print("Orb Server ".. Config.Version .." initialized")
+	print("[Orb] Server ".. Config.Version .." initialized")
 end
 
 function Orb.InitOrb(orb)
@@ -98,21 +103,6 @@ function Orb.InitOrb(orb)
 		ghosts.Name = "Ghosts"
 		ghosts.Parent = orb
 	end
-
-	-- Attach proximity prompts
-	local proximityPrompt = Instance.new("ProximityPrompt")
-	proximityPrompt.ActionText = "Attach"
-	proximityPrompt.MaxActivationDistance = 8
-	proximityPrompt.HoldDuration = 1
-	proximityPrompt.ObjectText = "Orb"
-	proximityPrompt.Parent = orb
-
-	ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
-		if prompt.Parent == orb then
-			Orb.AddListener(orb, player.UserId)
-			OrbAttachRemoteEvent:FireClient(player, orb)
-		end
-	end)
 
 	-- Make waypoints invisible
 	local waypointsFolder = orb:FindFirstChild("Waypoints")

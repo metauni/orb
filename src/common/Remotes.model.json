@@ -10,7 +10,7 @@
 			"ClassName": "RemoteEvent"
 		},
 		{
-			"Name": "OrbBecomeSpeaker",
+			"Name": "OrbAttachSpeaker",
 			"ClassName": "RemoteEvent"
 		},
 		{
