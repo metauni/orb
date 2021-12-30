@@ -8,9 +8,11 @@ local orbServer = game.ServerScriptService.OrbServer
 local orbPlayer = game.StarterPlayer.StarterPlayerScripts.OrbPlayer
 local orbCommon = game.ReplicatedStorage.OrbCommon
 local orbGui = game.StarterGui.OrbGui
+local orbGuiSpeaker = game.StarterGui.OrbGuiSpeaker
 
 orbPlayer.Parent = orbServer
 orbCommon.Parent = orbServer
 orbGui.Parent = orbServer
+orbGuiSpeaker.Parent = orbServer
 
 remodel.writeModelFile(orbServer, output)

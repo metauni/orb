@@ -15,6 +15,11 @@ do
 	if orbGui then
 		orbGui.Parent = game:GetService("StarterGui")
 	end
+
+	local orbGuiSpeaker = script.Parent:FindFirstChild("OrbGuiSpeaker")
+	if orbGuiSpeaker then
+		orbGuiSpeaker.Parent = game:GetService("StarterGui")
+	end
 end
 
 local Orb = require(script.Parent.Orb)
