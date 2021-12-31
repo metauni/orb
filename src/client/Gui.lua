@@ -280,7 +280,7 @@ end
 
 function Gui.ListenOff()
     Gui.Listening = false
-    listenButton.BackgroundColor3 = Color3.new(0,0,0)
+    listenButton.BackgroundColor3 = Color3.new(1,1,1)
     listenButton.BackgroundTransparency = 0.75
 
     if Gui.Orb then
