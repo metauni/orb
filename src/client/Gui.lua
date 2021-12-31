@@ -132,6 +132,15 @@ function Gui.Init()
 			if isScribeRF then
 				Gui.HasSpeakerPermission = isScribeRF:InvokeServer()
 			end
+
+            -- Update the visibility of speaker prompts
+            local orbs = CollectionService:GetTagged(Config.ObjectTag)
+            for _, orb in ipairs(orbs) do
+                local speakerPrompt = orb:FindFirstChild("SpeakerPrompt")
+                if speakerPrompt then
+                    speakerPrompt.Enabled = Gui.HasSpeakerPermission
+                end
+            end
 		end)
 	end
 
