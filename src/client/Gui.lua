@@ -21,6 +21,7 @@ local OrbTweeningStopRemoteEvent = Common.Remotes.OrbTweeningStop
 
 local listenerGui, speakerGui, listenButton, detachButton, returnButton
 local viewportFrame, peekButton, detachSpeakerButton, speakerViewportFrame
+local returnButtonSpeaker, peekButtonSpeaker
 local localPlayer
 
 local Gui = {}
@@ -46,6 +47,8 @@ function Gui.Init()
     peekButton = listenerGui.PeekButton
     viewportFrame = listenerGui.ViewportFrame
     speakerViewportFrame = speakerGui.ViewportFrame
+    returnButtonSpeaker = speakerGui.ReturnButton
+    peekButtonSpeaker = speakerGui.PeekButton
 
     -- 
     -- Listening
@@ -80,16 +83,36 @@ function Gui.Init()
         Gui.Detach()
     end)
 
+    returnButtonSpeaker.Activated:Connect(function()
+        -- Teleport us to our orb
+        OrbTeleportRemoteEvent:FireServer(Gui.Orb)
+    end)
+
     --
     -- Viewport
     --
 
     peekButton.Activated:Connect(function()
-        Gui.ViewportOn = not Gui.ViewportOn
+        Gui.ToggleOrbcam(false)
+        --Gui.ViewportOn = not Gui.ViewportOn
+        --if Gui.ViewportOn then Gui.PopulateViewport() end	
+	    --viewportFrame.Visible = Gui.ViewportOn
 
-        if Gui.ViewportOn then Gui.PopulateViewport() end	
-	
-	    viewportFrame.Visible = Gui.ViewportOn
+        if Gui.Orbcam then
+            peekButton.BackgroundColor3 = Color3.new(1,1,1)
+        else
+            peekButton.BackgroundColor3 = Color3.new(0,0,0)
+        end
+    end)
+
+    peekButtonSpeaker.Activated:Connect(function()
+        Gui.ToggleOrbcam(false)
+
+        if Gui.Orbcam then
+            peekButtonSpeaker.BackgroundColor3 = Color3.new(1,1,1)
+        else
+            peekButtonSpeaker.BackgroundColor3 = Color3.new(0,0,0)
+        end
     end)
 
     -- If the Admin system is installed, the permission specified there
@@ -128,7 +151,7 @@ function Gui.Init()
         if proximityPrompt == nil and speakerPrompt == nil then
             proximityPrompt = Instance.new("ProximityPrompt")
             proximityPrompt.Name = "NormalPrompt"
-            proximityPrompt.ActionText = "Attach"
+            proximityPrompt.ActionText = "Attach as Listener"
             proximityPrompt.MaxActivationDistance = 8
             proximityPrompt.HoldDuration = 1
             proximityPrompt.ObjectText = "Orb"
@@ -178,7 +201,7 @@ function Gui.Init()
                 return
             end
         end
-        Gui.ToggleOrbcam()
+        Gui.ToggleOrbcam(true)
     end
 
     local function HandleActivationInput(action, state, input)
@@ -433,7 +456,7 @@ function Gui.OrbcamTweeningStart(newPos, poiPos)
     Gui.CameraTween:Play()
 end
 
-function Gui.OrbcamOn()
+function Gui.OrbcamOn(guiOff)
     if Gui.Orb == nil then return end
 
     local poi, poiPos = Gui.PointOfInterest()
@@ -448,15 +471,27 @@ function Gui.OrbcamOn()
     local orbCameraPos = Vector3.new(Gui.Orb.Position.X, poiPos.Y, Gui.Orb.Position.Z)
 	camera.CFrame = CFrame.new(orbCameraPos,poiPos)
     
-	speakerGui.Enabled = false
-    listenerGui.Enabled = false
-	StarterGui:SetCore("TopbarEnabled", false)
+    if guiOff then
+        speakerGui.Enabled = false
+        listenerGui.Enabled = false
+        StarterGui:SetCore("TopbarEnabled", false)
+    end
+
     Gui.Orbcam = true
 end
 
-function Gui.OrbcamOff()
+function Gui.OrbcamOff(guiOff)
 	if Gui.CameraTween then Gui.CameraTween:Cancel() end
-	StarterGui:SetCore("TopbarEnabled", true)
+
+    if guiOff then
+        if Gui.Speaking then
+            speakerGui.Enabled = true
+        elseif Gui.Orb ~= nil then
+            listenerGui.Enabled = true
+        end
+
+	    StarterGui:SetCore("TopbarEnabled", true)
+    end
 	
 	local camera = workspace.CurrentCamera
 	camera.CameraType = Enum.CameraType.Custom
@@ -468,11 +503,13 @@ function Gui.OrbcamOff()
     Gui.Orbcam = false
 end
 
-function Gui.ToggleOrbcam()
+-- guiOff sets whether we turn off the topbar and other
+-- GUI elements, i.e. for when we use Shift-C
+function Gui.ToggleOrbcam(guiOff)
     if Gui.Orbcam then
-		Gui.OrbcamOff()
-	elseif not Gui.Orbcam and Gui.Orb ~= nil and Gui.HasSpeakerPermission then
-        Gui.OrbcamOn()
+		Gui.OrbcamOff(guiOff)
+	elseif not Gui.Orbcam and Gui.Orb ~= nil then
+        Gui.OrbcamOn(guiOff)
 	end
 end
 

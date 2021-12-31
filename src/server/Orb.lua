@@ -65,10 +65,22 @@ function Orb.Init()
 
 	-- Handle teleports
 	OrbTeleportRemoteEvent.OnServerEvent:Connect(function(plr, orb)
-		local ghostCFrame = Orb.GetGhost(orb, plr.UserId).PrimaryPart.CFrame
-		Orb.RemoveGhost(orb, plr.UserId)
-		wait(0.1)
-		plr.Character.PrimaryPart.CFrame = ghostCFrame
+		local ghost = Orb.GetGhost(orb, plr.UserId)
+		local targetCFrame
+
+		if ghost ~= nil then
+			-- This is a user attached as listener
+			targetCFrame = ghost.PrimaryPart.CFrame
+			Orb.RemoveGhost(orb, plr.UserId)
+			wait(0.1)
+		else
+			-- This is a speaker
+			targetCFrame = CFrame.new(orb.Position + Vector3.new(0,5 * orb.Size.Y,0))
+		end
+
+		if plr.Character then
+			plr.Character.PrimaryPart.CFrame = targetCFrame
+		end
 	end)
 
 	-- Remove leaving players as listeners
