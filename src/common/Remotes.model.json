@@ -20,6 +20,10 @@
 		{
 			"Name": "OrbTeleport",
 			"ClassName": "RemoteEvent"
+		},
+		{
+			"Name": "OrbTweening",
+			"ClassName": "RemoteEvent"
 		}
 	]
 }

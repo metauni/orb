@@ -1,6 +1,10 @@
 local Common = game:GetService("ReplicatedStorage").OrbCommon
 local SoundService = game:GetService("SoundService")
+local ContextActionService = game:GetService("ContextActionService")
+local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
 local CollectionService = game:GetService("CollectionService")
+local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 
@@ -12,9 +16,10 @@ local OrbDetachRemoteEvent = Common.Remotes.OrbDetach
 local OrbAttachSpeakerRemoteEvent = Common.Remotes.OrbAttachSpeaker
 local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
 local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
+local OrbTweeningRemoteEvent = Common.Remotes.OrbTweening
 
-local listenerGui, speakerGui, listenButton, detachButton, teleportButton
-local viewportFrame, boardButton, detachSpeakerButton, speakerViewportFrame
+local listenerGui, speakerGui, listenButton, detachButton, returnButton
+local viewportFrame, peekButton, detachSpeakerButton, speakerViewportFrame
 local localPlayer
 
 local Gui = {}
@@ -30,20 +35,16 @@ function Gui.Init()
     Gui.RunningConnection = nil
     Gui.ViewportOn = false
     Gui.HasSpeakerPermission = true -- can attach as speaker?
+    Gui.Orbcam = false
+    Gui.CameraTween = nil
 
     listenButton = listenerGui.ListenButton
     detachButton = listenerGui.DetachButton
     detachSpeakerButton = speakerGui.DetachButton
-    teleportButton = listenerGui.TeleportButton
-    boardButton = listenerGui.BoardButton
+    returnButton = listenerGui.ReturnButton
+    peekButton = listenerGui.PeekButton
     viewportFrame = listenerGui.ViewportFrame
     speakerViewportFrame = speakerGui.ViewportFrame
-    
-    -- Disable the viewport frame if there are no boards
-    local boards = CollectionService:GetTagged("metaboard")
-    if #boards == 0 then
-        boardButton.Visible = false
-    end
 
     -- 
     -- Listening
@@ -72,7 +73,7 @@ function Gui.Init()
     -- Teleporting
     --
 
-    teleportButton.Activated:Connect(function()
+    returnButton.Activated:Connect(function()
         -- Teleport us to our ghost
         OrbTeleportRemoteEvent:FireServer(Gui.Orb)
         Gui.Detach()
@@ -82,7 +83,7 @@ function Gui.Init()
     -- Viewport
     --
 
-    boardButton.Activated:Connect(function()
+    peekButton.Activated:Connect(function()
         Gui.ViewportOn = not Gui.ViewportOn
 
         if Gui.ViewportOn then Gui.PopulateViewport() end	
@@ -162,50 +163,99 @@ function Gui.Init()
 	speakerViewportFrame.CurrentCamera = viewportCamera
 	viewportCamera.Parent = speakerViewportFrame
 
+    -- Setup Orbcam
+    local ORBCAM_MACRO_KB = {Enum.KeyCode.LeftShift, Enum.KeyCode.C}
+    local function CheckMacro(macro)
+        for i = 1, #macro - 1 do
+            if not UserInputService:IsKeyDown(macro[i]) then
+                return
+            end
+        end
+        Gui.ToggleOrbcam()
+    end
+
+    local function HandleActivationInput(action, state, input)
+        if state == Enum.UserInputState.Begin then
+            if input.KeyCode == ORBCAM_MACRO_KB[#ORBCAM_MACRO_KB] then
+                CheckMacro(ORBCAM_MACRO_KB)
+            end
+        end
+        return Enum.ContextActionResult.Pass
+    end
+
+    ContextActionService:BindAction("OrbcamToggle", HandleActivationInput, false, ORBCAM_MACRO_KB[#ORBCAM_MACRO_KB])
+
+    -- Handle orb tweening
+    OrbTweeningRemoteEvent.OnClientEvent:Connect(Gui.OrbcamTweening)
+
 	print("[Orb] Gui Initialised")
+end
+
+-- A point of interest is any object tagged with either
+-- metaboard or metaorb_poi. Returns the closest point
+-- of interest to the current orb and its position and nil if none can
+-- be found. Note that a point of interest is either nil,
+-- a BasePart or a Model with non-nil PrimaryPart
+function Gui.PointOfInterest()
+    if Gui.Orb == nil then return end
+
+    local boards = CollectionService:GetTagged("metaboard")
+    local pois = CollectionService:GetTagged("metaorb_poi")
+
+    if #boards == 0 and #pois == 0 then return nil end
+
+    -- Find the closest board
+    local closestPoi = nil
+    local closestPos = nil
+    local minDistance = math.huge
+
+    local families = {boards, pois}
+
+    for _, family in ipairs(families) do
+        for _, p in ipairs(family) do
+            local pos = nil
+
+            if p:IsA("BasePart") then
+                pos = p.Position
+            elseif p:IsA("Model") and p.PrimaryPart ~= nil then
+                pos = p.PrimaryPart.Position
+            end
+
+            if pos ~= nil then
+                local distance = (pos - Gui.Orb.Position).Magnitude
+                if distance < minDistance then
+                    minDistance = distance
+                    closestPos = pos
+                    closestPoi = p
+                end
+            end
+        end
+    end
+
+    return closestPoi, closestPos
 end
 
 function Gui.PopulateViewport()
     viewportFrame:ClearAllChildren()
-	local boards = CollectionService:GetTagged("metaboard")
-	if #boards == 0 then return end
-    if not Gui.Orb then return end
 
-    -- Find the closest board
-    local closestBoard = nil
-    local minDistance = math.huge
+    if Gui.Orb == nil then return end
+    local pointOfInterest, poiPosition = Gui.PointOfInterest()
+    if pointOfInterest == nil or poiPosition == nil then return end
 
-    for _, board in ipairs(boards) do
-        local distance = (board.Position - Gui.Orb.Position).Magnitude
-        if distance < minDistance then
-            minDistance = distance
-            closestBoard = board
-        end 
+    -- Copy the point of interest and put it into the viewport
+    local poiCopy = pointOfInterest:Clone()
+    for _, tag in ipairs(CollectionService:GetTags(poiCopy)) do
+        CollectionService:RemoveTag(poiCopy, tag)
     end
-
-    if not closestBoard then return end
-
-    -- Put the board into the frame (we don't want to clone as this will trigger things)
-    local boardCopy = Instance.new("Part")
-    boardCopy.Size = closestBoard.Size
-    boardCopy.Color = closestBoard.Color
-    boardCopy.Material = closestBoard.Material
-    boardCopy.CFrame = closestBoard.CFrame
-    boardCopy.Parent = viewportFrame
-
-    -- Grab all the curves
-    if closestBoard:FindFirstChild("Canvas") and closestBoard.Canvas:FindFirstChild("Curves") then
-        local curveClone = closestBoard.Canvas.Curves:Clone()
-        curveClone.Parent = viewportFrame
-    end
+    poiCopy.Parent = viewportFrame
 	
 	local viewportCamera = Instance.new("Camera")
 	viewportFrame.CurrentCamera = viewportCamera
 	viewportCamera.Parent = viewportFrame
 	
-    local orbCameraPos = Vector3.new(Gui.Orb.Position.X, boardCopy.Position.Y, Gui.Orb.Position.Z)
+    local orbCameraPos = Vector3.new(Gui.Orb.Position.X, poiPosition.Y, Gui.Orb.Position.Z)
 
-	viewportCamera.CFrame = CFrame.new( orbCameraPos, closestBoard.Position )
+	viewportCamera.CFrame = CFrame.new( orbCameraPos, poiPosition )
 end
 
 function Gui.ListenOn()
@@ -240,6 +290,7 @@ function Gui.Detach()
     end
 
     Gui.ListenOff()
+    Gui.OrbcamOff()
     Gui.Speaking = false
     listenerGui.Enabled = false
     speakerGui.Enabled = false
@@ -265,6 +316,7 @@ function Gui.PopulateViewportSpeaker()
         CollectionService:RemoveTag(orbClone, tag)
     end
 
+    -- Get rid of waypoints and such
     orbClone:ClearAllChildren()
 
     orbClone.Position = Vector3.new(0,0,0)
@@ -308,6 +360,87 @@ function Gui.Attach(orb)
     
     listenerGui.Enabled = true
     Gui.Orb = orb
+end
+
+-- 
+-- Orbcam
+--
+
+local function resetCameraSubject()
+	local localPlayer = Players.LocalPlayer
+
+	if workspace.CurrentCamera and localPlayer.Character then
+		local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			workspace.CurrentCamera.CameraSubject = humanoid
+		end
+	end
+end
+
+-- Note that we will refuse to move the camera if there is nothing to look _at_
+function Gui.OrbcamTweening(newPos, poiPos)
+    if not Gui.Orbcam then return end
+    if newPos == nil or poiPos == nil then return end
+
+    local camera = workspace.CurrentCamera
+	local tweenInfo = TweenInfo.new(
+			Config.TweenTime, -- Time
+			Enum.EasingStyle.Quad, -- EasingStyle
+			Enum.EasingDirection.Out, -- EasingDirection
+			0, -- RepeatCount (when less than zero the tween will loop indefinitely)
+			false, -- Reverses (tween will reverse once reaching it's goal)
+			0 -- DelayTime
+		)
+
+    local orbCameraPos = Vector3.new(newPos.X, poiPos.Y, newPos.Z)
+
+    Gui.CameraTween = TweenService:Create(camera, tweenInfo, 
+        {CFrame = CFrame.new(orbCameraPos, poiPos)})
+
+    Gui.CameraTween:Play()
+end
+
+function Gui.OrbcamOn()
+    if Gui.Orb == nil then return end
+
+    local poi, poiPos = Gui.PointOfInterest()
+    if poi == nil or poiPos == nil then return end
+
+	local camera = workspace.CurrentCamera
+	
+	if camera.CameraType ~= Enum.CameraType.Scriptable then
+		camera.CameraType = Enum.CameraType.Scriptable
+	end
+	
+    local orbCameraPos = Vector3.new(Gui.Orb.Position.X, poiPos.Y, Gui.Orb.Position.Z)
+	camera.CFrame = CFrame.new(orbCameraPos,poiPos)
+    
+	speakerGui.Enabled = false
+    listenerGui.Enabled = false
+	StarterGui:SetCore("TopbarEnabled", false)
+    Gui.Orbcam = true
+end
+
+function Gui.OrbcamOff()
+	if Gui.CameraTween then Gui.CameraTween:Cancel() end
+	StarterGui:SetCore("TopbarEnabled", true)
+	
+	local camera = workspace.CurrentCamera
+	camera.CameraType = Enum.CameraType.Custom
+
+    if Gui.Speaking then speakerGui.Enabled = true end
+    if Gui.Orb ~= nil and not Gui.Speaking then listenerGui.Enabled = true end
+	
+	resetCameraSubject()
+    Gui.Orbcam = false
+end
+
+function Gui.ToggleOrbcam()
+    if Gui.Orbcam then
+		Gui.OrbcamOff()
+	elseif not Gui.Orbcam and Gui.Orb ~= nil and Gui.HasSpeakerPermission then
+        Gui.OrbcamOn()
+	end
 end
 
 return Gui

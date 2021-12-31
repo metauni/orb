@@ -10,6 +10,7 @@ local OrbDetachRemoteEvent = Common.Remotes.OrbDetach
 local OrbAttachSpeakerRemoteEvent = Common.Remotes.OrbAttachSpeaker
 local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
 local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
+local OrbTweeningRemoteEvent = Common.Remotes.OrbTweening
 
 local Orb = {}
 Orb.__index = Orb
@@ -25,7 +26,7 @@ function Orb.Init()
 	end
 
 	CollectionService:GetInstanceAddedSignal(Config.ObjectTag):Connect(function(orb)
-		Orb.InitBoard(orb)
+		Orb.InitOrb(orb)
 	end)
 
 	OrbDetachRemoteEvent.OnServerEvent:Connect(function(plr, orb)
@@ -74,6 +75,15 @@ function Orb.Init()
 		Orb.RemoveListenerFromAllOrbs(plr.UserId)
 	end)
 
+	-- Make waypoints invisible
+	local waypoints = CollectionService:GetTagged(Config.WaypointTag)
+
+	for _, waypoint in ipairs(waypoints) do
+		waypoint.Transparency = 1
+		waypoint.Anchored = true
+		waypoint.CanCollide = false
+	end
+
 	print("[Orb] Server ".. Config.Version .." initialized")
 end
 
@@ -104,16 +114,16 @@ function Orb.InitOrb(orb)
 		ghosts.Parent = orb
 	end
 
-	-- Make waypoints invisible
-	local waypointsFolder = orb:FindFirstChild("Waypoints")
-
-	if waypointsFolder then
-		for _, waypoints in ipairs(waypointsFolder:GetChildren()) do
-			waypoints.Transparency = 1
-			waypoints.Anchored = true
-			waypoints.CanCollide = false
-		end
-	end
+    -- Make a waypoint at the position of every orb
+	local waypoint = Instance.new("Part")
+	waypoint.Position = orb.Position
+	waypoint.Name = "OriginWaypoint"
+	waypoint.Size = Vector3.new(1,1,1)
+	waypoint.Transparency = 1
+	waypoint.Anchored = true
+	waypoint.CanCollide = false
+	CollectionService:AddTag(waypoint, "metaorb_waypoint")
+	waypoint.Parent = orb
 end
 
 function Orb.RotateGhostToFaceSpeaker(orb, ghost)
@@ -192,49 +202,57 @@ function Orb.WalkGhosts(orb, pos)
 end
 
 function Orb.TweenOrbToNearPosition(orb, pos)
-	local waypointsFolder = orb:FindFirstChild("Waypoints")
-	if not waypointsFolder then return orb.Position end
+	local waypoints = CollectionService:GetTagged(Config.WaypointTag)
+
+	if #waypoints == 0 then return orb.Position end
 
 	-- Find the closest waypoint to the new position
 	-- and move the orb there
 	local minDistance = math.huge
 	local minWaypoint = nil
 
-	if waypointsFolder then
-		local waypoints = waypointsFolder:GetChildren()
-
-		for _, waypoint in ipairs(waypoints) do
-			local distance = (waypoint.Position - pos).Magnitude
-			if distance < minDistance then
-				minDistance = distance
-				minWaypoint = waypoint
-			end
+	for _, waypoint in ipairs(waypoints) do
+		local distance = (waypoint.Position - pos).Magnitude
+		if distance < minDistance then
+			minDistance = distance
+			minWaypoint = waypoint
 		end
+	end
 
-		if minWaypoint then
-			-- If we are already there, don't tween
-			if minWaypoint.Position == orb.Position then
-				return minWaypoint.Position
-			end
-
-			local tweenInfo = TweenInfo.new(
-				3, -- Time
-				Enum.EasingStyle.Quad, -- EasingStyle
-				Enum.EasingDirection.Out, -- EasingDirection
-				0, -- RepeatCount (when less than zero the tween will loop indefinitely)
-				false, -- Reverses (tween will reverse once reaching it's goal)
-				0 -- DelayTime
-			)
-		
-			local orbTween = TweenService:Create(orb, tweenInfo, 
-				{Position = minWaypoint.Position})
-			
-			-- Note that if the position is already being tweened, this will
-			-- stop that tween and commence this one
-			orbTween:Play()
-
+	if minWaypoint then
+		-- If we are already there, don't tween
+		if minWaypoint.Position == orb.Position then
 			return minWaypoint.Position
 		end
+
+		local tweenInfo = TweenInfo.new(
+			Config.TweenTime, -- Time
+			Enum.EasingStyle.Quad, -- EasingStyle
+			Enum.EasingDirection.Out, -- EasingDirection
+			0, -- RepeatCount (when less than zero the tween will loop indefinitely)
+			false, -- Reverses (tween will reverse once reaching it's goal)
+			0 -- DelayTime
+		)
+	
+		local poiPos = Orb.PointOfInterest(minWaypoint.Position)
+		
+		local orbTween
+		if poiPos ~= nil then
+			orbTween = TweenService:Create(orb, tweenInfo, 
+				{CFrame = CFrame.new(minWaypoint.Position, poiPos)})
+		else
+			orbTween = TweenService:Create(orb, tweenInfo, 
+				{Position = minWaypoint.Position})
+		end
+
+		-- Note that if the position is already being tweened, this will
+		-- stop that tween and commence this one
+		orbTween:Play()
+
+		-- Announce this tween to clients
+		OrbTweeningRemoteEvent:FireAllClients(minWaypoint.Position, poiPos)
+
+		return minWaypoint.Position
 	end
 
 	return orb.Position
@@ -343,6 +361,46 @@ function Orb.GetSpeakerPosition(orb)
 	if not plr then return nil end
 
 	return plr.Character.PrimaryPart.Position
+end
+
+-- A point of interest is any object tagged with either
+-- metaboard or metaorb_poi. Returns the closest point
+-- of interest to the current orb and its position and nil if none can
+-- be found. Note that a point of interest is either nil,
+-- a BasePart or a Model with non-nil PrimaryPart
+function Orb.PointOfInterest(targetPos)
+    local boards = CollectionService:GetTagged("metaboard")
+    local pois = CollectionService:GetTagged("metaorb_poi")
+
+    if #boards == 0 and #pois == 0 then return nil end
+
+    -- Find the closest board
+    local closestPos = nil
+    local minDistance = math.huge
+
+    local families = {boards, pois}
+
+    for _, family in ipairs(families) do
+        for _, p in ipairs(family) do
+            local pos = nil
+
+            if p:IsA("BasePart") then
+                pos = p.Position
+            elseif p:IsA("Model") and p.PrimaryPart ~= nil then
+                pos = p.PrimaryPart.Position
+            end
+
+            if pos ~= nil then
+                local distance = (pos - targetPos).Magnitude
+                if distance < minDistance then
+                    minDistance = distance
+                    closestPos = pos
+                end
+            end
+        end
+    end
+
+    return closestPos
 end
 
 return Orb

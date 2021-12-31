@@ -2,7 +2,7 @@
 
 Orbs are audiovisual devices with the following features:
 
-* Any user can attach to an *orb* as a *listener* and hear whatever audio the orb hears.
+* Any user can attach to an orb as a *listener* and hear whatever audio the orb hears. They leave behind a ghost near the orb as an indicator to others that they are potentially listening.
 
 * Users with the right permission can attach to an orb as a *speaker*. The orb will then follow the speaker using *waypoints*.
 
@@ -10,9 +10,9 @@ Orbs are audiovisual devices with the following features:
 
 There is an [introductory video](https://youtu.be/0vuNKcCv1sk). In more detail
 
-* An *orb* is any part with the tag `metaorb`
-* A *waypoint* is any part with the tag `metaorb_waypoint`
-* A *point of interest* is any part with the tag `metaorb_poi` or `metaboard`.
+* An *orb* is any `BasePart` with the tag `metaorb`
+* A *waypoint* is any `BasePart` with the tag `metaorb_waypoint`
+* A *point of interest* is any `BasePart` or `Model` with the tag `metaorb_poi` or `metaboard`.
 
 A typical example: waypoints are located in front of metaboards, and an orb follows a speaker from board to board.
 
