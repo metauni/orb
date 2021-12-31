@@ -28,8 +28,8 @@ Gui.__index = Gui
 
 function Gui.Init()
     localPlayer = Players.LocalPlayer
-    listenerGui = localPlayer.PlayerGui.OrbGui
-    speakerGui = localPlayer.PlayerGui.OrbGuiSpeaker
+    listenerGui = localPlayer.PlayerGui:WaitForChild("OrbGui",math.huge)
+    speakerGui = localPlayer.PlayerGui:WaitForChild("OrbGuiSpeaker",math.huge)
     Gui.Listening = false
     Gui.Speaking = false
     Gui.Orb = nil
@@ -121,41 +121,47 @@ function Gui.Init()
     local orbs = CollectionService:GetTagged(Config.ObjectTag)
     for _, orb in ipairs(orbs) do
         -- Attach proximity prompts
-        local proximityPrompt = Instance.new("ProximityPrompt")
-        proximityPrompt.Name = "NormalPrompt"
-        proximityPrompt.ActionText = "Attach"
-        proximityPrompt.MaxActivationDistance = 8
-        proximityPrompt.HoldDuration = 1
-        proximityPrompt.ObjectText = "Orb"
-        proximityPrompt.Parent = orb
+        local proximityPrompt = orb:FindFirstChild("NormalPrompt")
+        local speakerPrompt = orb:FindFirstChild("SpeakerPrompt")
 
-        -- Attach speaker prompts
-        local speakerPrompt = Instance.new("ProximityPrompt")
-        speakerPrompt.Name = "SpeakerPrompt"
-        speakerPrompt.ActionText = "Attach as Speaker"
-        speakerPrompt.UIOffset = Vector2.new(0,75)
-        speakerPrompt.MaxActivationDistance = 8
-        speakerPrompt.HoldDuration = 1
-        speakerPrompt.KeyboardKeyCode = Enum.KeyCode.F
-        speakerPrompt.GamepadKeyCode = Enum.KeyCode.ButtonY
-        speakerPrompt.ObjectText = "Orb"
-        speakerPrompt.Enabled = Gui.HasSpeakerPermission
-        speakerPrompt.Parent = orb
+        -- Note that this gets called again after player reset
+        if proximityPrompt == nil and speakerPrompt == nil then
+            proximityPrompt = Instance.new("ProximityPrompt")
+            proximityPrompt.Name = "NormalPrompt"
+            proximityPrompt.ActionText = "Attach"
+            proximityPrompt.MaxActivationDistance = 8
+            proximityPrompt.HoldDuration = 1
+            proximityPrompt.ObjectText = "Orb"
+            proximityPrompt.Parent = orb
 
-        ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
-            if prompt.Parent == orb and prompt.Name == "NormalPrompt" then
-                OrbAttachRemoteEvent:FireServer(orb)
-                Gui.Attach(orb)
-            end
+            -- Attach speaker prompts
+            speakerPrompt = Instance.new("ProximityPrompt")
+            speakerPrompt.Name = "SpeakerPrompt"
+            speakerPrompt.ActionText = "Attach as Speaker"
+            speakerPrompt.UIOffset = Vector2.new(0,75)
+            speakerPrompt.MaxActivationDistance = 8
+            speakerPrompt.HoldDuration = 1
+            speakerPrompt.KeyboardKeyCode = Enum.KeyCode.F
+            speakerPrompt.GamepadKeyCode = Enum.KeyCode.ButtonY
+            speakerPrompt.ObjectText = "Orb"
+            speakerPrompt.Enabled = Gui.HasSpeakerPermission
+            speakerPrompt.Parent = orb
 
-            if prompt.Parent == orb and prompt.Name == "SpeakerPrompt" then
-                -- Only allow someone to attach if there is no current speaker
-                if orb.Speaker.Value == 0 then
-                    OrbAttachSpeakerRemoteEvent:FireServer(orb)
-                    Gui.AttachSpeaker(orb)
+            ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
+                if prompt.Parent == orb and prompt.Name == "NormalPrompt" then
+                    OrbAttachRemoteEvent:FireServer(orb)
+                    Gui.Attach(orb)
                 end
-            end
-        end)
+    
+                if prompt.Parent == orb and prompt.Name == "SpeakerPrompt" then
+                    -- Only allow someone to attach if there is no current speaker
+                    if orb.Speaker.Value == 0 then
+                        OrbAttachSpeakerRemoteEvent:FireServer(orb)
+                        Gui.AttachSpeaker(orb)
+                    end
+                end
+            end)
+        end
     end
 
     -- Setup a camera on the speaker viewport frame
