@@ -189,7 +189,11 @@ function Orb.WalkGhosts(orb, pos)
 				-- If it was too far for the ghost to reach, just teleport them
 				if not reached then
 					local speakerPos = Orb.GetSpeakerPosition(orb)
-					ghost.PrimaryPart.CFrame = CFrame.new(newPos, speakerPos)
+					if speakerPos ~= nil then
+						ghost.PrimaryPart.CFrame = CFrame.new(newPos, speakerPos)
+					else
+						ghost.PrimaryPart.Position = newPos
+					end
 				else
 					Orb.RotateGhostToFaceSpeaker(orb, ghost)
 				end
