@@ -22,7 +22,11 @@
 			"ClassName": "RemoteEvent"
 		},
 		{
-			"Name": "OrbTweening",
+			"Name": "OrbTweeningStart",
+			"ClassName": "RemoteEvent"
+		},
+		{
+			"Name": "OrbTweeningStop",
 			"ClassName": "RemoteEvent"
 		}
 	]

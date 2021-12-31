@@ -16,7 +16,8 @@ local OrbDetachRemoteEvent = Common.Remotes.OrbDetach
 local OrbAttachSpeakerRemoteEvent = Common.Remotes.OrbAttachSpeaker
 local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
 local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
-local OrbTweeningRemoteEvent = Common.Remotes.OrbTweening
+local OrbTweeningStartRemoteEvent = Common.Remotes.OrbTweeningStart
+local OrbTweeningStopRemoteEvent = Common.Remotes.OrbTweeningStop
 
 local listenerGui, speakerGui, listenButton, detachButton, returnButton
 local viewportFrame, peekButton, detachSpeakerButton, speakerViewportFrame
@@ -186,7 +187,8 @@ function Gui.Init()
     ContextActionService:BindAction("OrbcamToggle", HandleActivationInput, false, ORBCAM_MACRO_KB[#ORBCAM_MACRO_KB])
 
     -- Handle orb tweening
-    OrbTweeningRemoteEvent.OnClientEvent:Connect(Gui.OrbcamTweening)
+    OrbTweeningStartRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStart)
+    OrbTweeningStopRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStop)
 
 	print("[Orb] Gui Initialised")
 end
@@ -283,10 +285,12 @@ end
 -- Detach, as listener or speaker
 function Gui.Detach()
     if not Gui.Orb then return end
+    local orb = Gui.Orb
 
-    Gui.Orb.NormalPrompt.Enabled = true
-    if Gui.HasSpeakerPermission then
-        Gui.Orb.SpeakerPrompt.Enabled = true
+    -- If the orb is currently on the move, do not enable it yet
+    if not orb:GetAttribute("tweening") then
+        orb.NormalPrompt.Enabled = true
+        orb.SpeakerPrompt.Enabled = Gui.HasSpeakerPermission
     end
 
     Gui.ListenOff()
@@ -300,7 +304,7 @@ function Gui.Detach()
         Gui.RunningConnection = nil
     end
 
-    OrbDetachRemoteEvent:FireServer(Gui.Orb)
+    OrbDetachRemoteEvent:FireServer(orb)
     Gui.Orb = nil
 end
 
@@ -377,8 +381,31 @@ local function resetCameraSubject()
 	end
 end
 
+function Gui.OrbTweeningStart(orb, newPos, poiPos)
+    -- Start camera moving if it is enabled, and the tweening
+    -- orb is the one we are attached to
+    if Gui.Orb and orb == Gui.Orb and Gui.Orbcam then
+        Gui.OrbcamTweeningStart(newPos, poiPos)
+    end
+
+    -- Turn off proximity prompts on this orb
+    orb.NormalPrompt.Enabled = false
+    orb.SpeakerPrompt.Enabled = false
+    orb:SetAttribute("tweening", true)
+end
+
+function Gui.OrbTweeningStop(orb)
+    -- Turn back on the proximity prompts, but only for orbs we're not attached to
+    if orb ~= Gui.Orb then
+        orb.NormalPrompt.Enabled = true
+        orb.SpeakerPrompt.Enabled = Gui.HasSpeakerPermission
+    end
+
+    orb:SetAttribute("tweening", false)
+end
+
 -- Note that we will refuse to move the camera if there is nothing to look _at_
-function Gui.OrbcamTweening(newPos, poiPos)
+function Gui.OrbcamTweeningStart(newPos, poiPos)
     if not Gui.Orbcam then return end
     if newPos == nil or poiPos == nil then return end
 

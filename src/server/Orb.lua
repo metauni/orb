@@ -10,7 +10,8 @@ local OrbDetachRemoteEvent = Common.Remotes.OrbDetach
 local OrbAttachSpeakerRemoteEvent = Common.Remotes.OrbAttachSpeaker
 local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
 local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
-local OrbTweeningRemoteEvent = Common.Remotes.OrbTweening
+local OrbTweeningStartRemoteEvent = Common.Remotes.OrbTweeningStart
+local OrbTweeningStopRemoteEvent = Common.Remotes.OrbTweeningStop
 
 local Orb = {}
 Orb.__index = Orb
@@ -221,8 +222,17 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 
 	if minWaypoint then
 		-- If we are already there, don't tween
-		if minWaypoint.Position == orb.Position then
-			return minWaypoint.Position
+		if (minWaypoint.Position - orb.Position).Magnitude < 0.01 then
+			return orb.Position
+		end
+
+		-- If there is an orb already there, don't tween
+		local orbs = CollectionService:GetTagged(Config.ObjectTag)
+
+		for _, otherOrb in ipairs(orbs) do
+			if otherOrb ~= orb and (minWaypoint.Position - otherOrb.Position).Magnitude < 0.01 then
+				return orb.Position
+			end
 		end
 
 		local tweenInfo = TweenInfo.new(
@@ -245,12 +255,16 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 				{Position = minWaypoint.Position})
 		end
 
+		orbTween.Completed:Connect(function()
+			OrbTweeningStopRemoteEvent:FireAllClients(orb)
+		end)
+
 		-- Note that if the position is already being tweened, this will
 		-- stop that tween and commence this one
 		orbTween:Play()
 
 		-- Announce this tween to clients
-		OrbTweeningRemoteEvent:FireAllClients(minWaypoint.Position, poiPos)
+		OrbTweeningStartRemoteEvent:FireAllClients(orb, minWaypoint.Position, poiPos)
 
 		return minWaypoint.Position
 	end
