@@ -16,3 +16,7 @@ end
 Players.LocalPlayer.CharacterAdded:Connect(function(character)
 	Gui.Init()
 end)
+
+Players.LocalPlayer.CharacterRemoving:Connect(function()
+	Gui.Detach()
+end)
