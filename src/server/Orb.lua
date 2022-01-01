@@ -13,9 +13,10 @@ local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
 local OrbTweeningStartRemoteEvent = Common.Remotes.OrbTweeningStart
 local OrbTweeningStopRemoteEvent = Common.Remotes.OrbTweeningStop
 
-local speakerAttachSounds = { 7873470864, 7873470625, 7873470425,
-7873469842, 7873470126, 7864771146, 7864770869, 7864770493, 
-8214754508, 8214755036, 8214754917, 8214754703}
+local speakerAttachSoundIds = { 7873470625, 7873470425,
+7873469842, 7873470126, 7864771146, 7864770493, 8214755036, 8214754703}
+
+local speakerDetachSoundId = 7864770869
 
 local Orb = {}
 Orb.__index = Orb
@@ -41,7 +42,7 @@ function Orb.Init()
 		-- they detached from being the speaker
 		if orb.Speaker.Value == plr.UserId then
 			Orb.SetSpeaker(orb, nil)
-			Orb.PlayNotificationSound(orb, true)
+			Orb.PlayDetachSpeakerSound(orb)
 
 			local plight = orb:FindFirstChild("PointLight")
 			if plight then plight.Enabled = false end
@@ -58,7 +59,7 @@ function Orb.Init()
 		local plight = orb:FindFirstChild("PointLight")
 		if plight then plight.Enabled = true end
 
-		Orb.PlayNotificationSound(orb, false)
+		Orb.PlayAttachSpeakerSound(orb, true)
 	end)
 
 	OrbSpeakerMovedRemoteEvent.OnServerEvent:Connect(function(plr, orb)
@@ -154,9 +155,9 @@ function Orb.InitOrb(orb)
 
 	-- Sound to announce speaker attachment
 	local announceSound = Instance.new("Sound")
-	local soundId = math.random(1, #speakerAttachSounds)
-	announceSound.Name = "Sound"
-	announceSound.SoundId = "rbxassetid://" .. tostring(speakerAttachSounds[soundId])
+	local soundId = math.random(1, #speakerAttachSoundIds)
+	announceSound.Name = "AttachSound"
+	announceSound.SoundId = "rbxassetid://" .. tostring(speakerAttachSoundIds[soundId])
 	announceSound.RollOffMode = Enum.RollOffMode.InverseTapered
 	announceSound.RollOffMaxDistance = 200
 	announceSound.RollOffMinDistance = 10
@@ -165,22 +166,47 @@ function Orb.InitOrb(orb)
 	announceSound.Volume = 0.3
 	announceSound.Parent = orb
 
+	-- Sound to announce speaker attachment
+	local detachSpeakerSound = Instance.new("Sound")
+	detachSpeakerSound.Name = "DetachSound"
+	detachSpeakerSound.SoundId = "rbxassetid://" .. tostring(speakerDetachSoundId)
+	detachSpeakerSound.RollOffMode = Enum.RollOffMode.InverseTapered
+	detachSpeakerSound.RollOffMaxDistance = 200
+	detachSpeakerSound.RollOffMinDistance = 10
+	detachSpeakerSound.Playing = false
+	detachSpeakerSound.Looped = false
+	detachSpeakerSound.Volume = 0.3
+	detachSpeakerSound.Parent = orb
+
 	-- Light
 	local plight = Instance.new("PointLight")
 	plight.Name = "PointLight"
-	plight.Brightness = 1
+	plight.Brightness = 1.5
 	plight.Range = 8
 	plight.Enabled = false
 	plight.Parent = orb
 end
 
-function Orb.PlayNotificationSound(orb, changeSound)
+function Orb.PlayDetachSpeakerSound(orb)
 	if orb == nil then
-		print("[Orb] ERROR - Attempted to play notification sound on nil orb")
+		print("[Orb] ERROR - Attempted to play detach sound on nil orb")
 		return
 	end
 
-	local sound = orb:FindFirstChild("Sound")
+	local sound = orb:FindFirstChild("DetachSound")
+	if sound then
+		if not sound.IsLoaded then sound.Loaded:Wait() end
+		sound:Play()
+	end
+end
+
+function Orb.PlayAttachSpeakerSound(orb, changeSound)
+	if orb == nil then
+		print("[Orb] ERROR - Attempted to play attach sound on nil orb")
+		return
+	end
+
+	local sound = orb:FindFirstChild("AttachSound")
 	if sound then
 		if not sound.IsLoaded then sound.Loaded:Wait() end
 		sound:Play()
@@ -188,8 +214,8 @@ function Orb.PlayNotificationSound(orb, changeSound)
 		if changeSound then
 			local connection
 			connection = sound.Ended:Connect(function()
-				local soundId = math.random(1, #speakerAttachSounds)
-				sound.SoundId = "rbxassetid://" .. tostring(speakerAttachSounds[soundId])
+				local soundId = math.random(1, #speakerAttachSoundIds)
+				sound.SoundId = "rbxassetid://" .. tostring(speakerAttachSoundIds[soundId])
 				connection:Disconnect()
 				connection = nil
 			end)
