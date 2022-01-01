@@ -65,6 +65,9 @@ function Orb.Init()
 
 	-- Handle teleports
 	OrbTeleportRemoteEvent.OnServerEvent:Connect(function(plr, orb)
+		if not plr and plr.Character then return end
+		if not orb then return end
+
 		local ghost = Orb.GetGhost(orb, plr.UserId)
 		local targetCFrame
 
@@ -78,9 +81,7 @@ function Orb.Init()
 			targetCFrame = CFrame.new(orb.Position + Vector3.new(0,5 * orb.Size.Y,0))
 		end
 
-		if plr.Character then
-			plr.Character.PrimaryPart.CFrame = targetCFrame
-		end
+		plr.Character.PrimaryPart.CFrame = targetCFrame
 	end)
 
 	-- Remove leaving players as listeners
@@ -325,6 +326,11 @@ function Orb.AddGhost(orb, playerId)
 end
 
 function Orb.GetGhost(orb, playerId)
+	if orb == nil then
+		print("[Orb] ERROR - Attempted to get ghosts of nil")
+		return
+	end
+
 	for _, ghost in ipairs(orb.Ghosts:GetChildren()) do
 		if ghost.Name == tostring(playerId) then
 			return ghost
@@ -335,6 +341,11 @@ function Orb.GetGhost(orb, playerId)
 end
 
 function Orb.AddListener(orb, listenerID)
+	if orb == nil then
+		print("[Orb] ERROR - Attempted to add listener to nil")
+		return
+	end
+
 	for _, listenerValue in ipairs(orb.Listeners:GetChildren()) do
 		if listenerValue.Value == listenerID then return end
 	end
@@ -348,6 +359,11 @@ function Orb.AddListener(orb, listenerID)
 end
 
 function Orb.RemoveGhost(orb, playerId)
+	if orb == nil then
+		print("[Orb] ERROR - Attempted to remove ghost from nil")
+		return
+	end
+
 	for _, ghost in ipairs(orb.Ghosts:GetChildren()) do
 		if ghost.Name == tostring(playerId) then
 			ghost:Destroy()
@@ -357,6 +373,11 @@ function Orb.RemoveGhost(orb, playerId)
 end
 
 function Orb.RemoveListener(orb, listenerID)
+	if orb == nil then
+		print("[Orb] ERROR - Attempted to remove listener from nil")
+		return
+	end
+
 	for _, listenerValue in ipairs(orb.Listeners:GetChildren()) do
 		if listenerValue.Value == listenerID then
 			listenerValue:Destroy()

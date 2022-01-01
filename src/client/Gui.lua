@@ -94,9 +94,6 @@ function Gui.Init()
 
     peekButton.Activated:Connect(function()
         Gui.ToggleOrbcam(false)
-        --Gui.ViewportOn = not Gui.ViewportOn
-        --if Gui.ViewportOn then Gui.PopulateViewport() end	
-	    --viewportFrame.Visible = Gui.ViewportOn
 
         if Gui.Orbcam then
             peekButton.BackgroundColor3 = Color3.new(1,1,1)
@@ -137,7 +134,10 @@ function Gui.Init()
             local orbs = CollectionService:GetTagged(Config.ObjectTag)
             for _, orb in ipairs(orbs) do
                 local speakerPrompt = orb:FindFirstChild("SpeakerPrompt")
-                if speakerPrompt then
+
+                -- If we are not currently attached as either or speaker
+                -- or listener, make the speaker prompt enabled
+                if speakerPrompt and not Gui.Orb == orb then
                     speakerPrompt.Enabled = Gui.HasSpeakerPermission
                 end
             end
@@ -164,6 +164,7 @@ function Gui.Init()
             proximityPrompt.MaxActivationDistance = 8
             proximityPrompt.HoldDuration = 1
             proximityPrompt.ObjectText = "Orb"
+            proximityPrompt.RequiresLineOfSight = false
             proximityPrompt.Parent = orb
 
             -- Attach speaker prompts
@@ -176,6 +177,7 @@ function Gui.Init()
             speakerPrompt.KeyboardKeyCode = Enum.KeyCode.F
             speakerPrompt.GamepadKeyCode = Enum.KeyCode.ButtonY
             speakerPrompt.ObjectText = "Orb"
+            proximityPrompt.RequiresLineOfSight = false
             speakerPrompt.Enabled = Gui.HasSpeakerPermission
             speakerPrompt.Parent = orb
 
@@ -300,7 +302,6 @@ end
 
 function Gui.ListenOn()
     Gui.Listening = true
-    listenButton.BackgroundColor3 = Color3.new(0, 0.920562, 0.199832)
     listenButton.BackgroundTransparency = 0.2
 
     if Gui.Orb then
@@ -312,7 +313,6 @@ end
 
 function Gui.ListenOff()
     Gui.Listening = false
-    listenButton.BackgroundColor3 = Color3.new(1,1,1)
     listenButton.BackgroundTransparency = 0.75
 
     if Gui.Orb then
