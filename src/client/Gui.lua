@@ -336,6 +336,8 @@ function Gui.Detach()
     Gui.Speaking = false
     listenerGui.Enabled = false
     speakerGui.Enabled = false
+    peekButton.BackgroundColor3 = Color3.new(0,0,0)
+    peekButtonSpeaker.BackgroundColor3 = Color3.new(0,0,0)
 
     if Gui.RunningConnection then
         Gui.RunningConnection:Disconnect()
