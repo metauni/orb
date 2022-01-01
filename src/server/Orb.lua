@@ -42,6 +42,9 @@ function Orb.Init()
 		if orb.Speaker.Value == plr.UserId then
 			Orb.SetSpeaker(orb, nil)
 			Orb.PlayNotificationSound(orb, true)
+
+			local plight = orb:FindFirstChild("PointLight")
+			if plight then plight.Enabled = false end
 		end
 	end)
 
@@ -51,6 +54,10 @@ function Orb.Init()
 
 	OrbAttachSpeakerRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		Orb.SetSpeaker(orb, plr.UserId)
+		
+		local plight = orb:FindFirstChild("PointLight")
+		if plight then plight.Enabled = true end
+
 		Orb.PlayNotificationSound(orb, false)
 	end)
 
@@ -157,6 +164,14 @@ function Orb.InitOrb(orb)
 	announceSound.Looped = false
 	announceSound.Volume = 0.3
 	announceSound.Parent = orb
+
+	-- Light
+	local plight = Instance.new("PointLight")
+	plight.Name = "PointLight"
+	plight.Brightness = 1
+	plight.Range = 8
+	plight.Enabled = false
+	plight.Parent = orb
 end
 
 function Orb.PlayNotificationSound(orb, changeSound)
