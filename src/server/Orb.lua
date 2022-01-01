@@ -13,6 +13,10 @@ local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
 local OrbTweeningStartRemoteEvent = Common.Remotes.OrbTweeningStart
 local OrbTweeningStopRemoteEvent = Common.Remotes.OrbTweeningStop
 
+local speakerAttachSounds = { 7873470864, 7873470625, 7873470425,
+7873469842, 7873470126, 7864771146, 7864770869, 7864770493, 
+8214754508, 8214755036, 8214754917, 8214754703}
+
 local Orb = {}
 Orb.__index = Orb
 
@@ -37,6 +41,7 @@ function Orb.Init()
 		-- they detached from being the speaker
 		if orb.Speaker.Value == plr.UserId then
 			Orb.SetSpeaker(orb, nil)
+			Orb.PlayNotificationSound(orb, true)
 		end
 	end)
 
@@ -46,6 +51,7 @@ function Orb.Init()
 
 	OrbAttachSpeakerRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		Orb.SetSpeaker(orb, plr.UserId)
+		Orb.PlayNotificationSound(orb, false)
 	end)
 
 	OrbSpeakerMovedRemoteEvent.OnServerEvent:Connect(function(plr, orb)
@@ -84,7 +90,7 @@ function Orb.Init()
 		plr.Character.PrimaryPart.CFrame = targetCFrame
 	end)
 
-	-- Remove leaving players as listeners
+	-- Remove leaving players as listeners and speakers
 	Players.PlayerRemoving:Connect(function(plr)
 		Orb.RemoveListenerFromAllOrbs(plr.UserId)
 	end)
@@ -138,6 +144,42 @@ function Orb.InitOrb(orb)
 	waypoint.CanCollide = false
 	CollectionService:AddTag(waypoint, "metaorb_waypoint")
 	waypoint.Parent = orb
+
+	-- Sound to announce speaker attachment
+	local announceSound = Instance.new("Sound")
+	local soundId = math.random(1, #speakerAttachSounds)
+	announceSound.Name = "Sound"
+	announceSound.SoundId = "rbxassetid://" .. tostring(speakerAttachSounds[soundId])
+	announceSound.RollOffMode = Enum.RollOffMode.InverseTapered
+	announceSound.RollOffMaxDistance = 200
+	announceSound.RollOffMinDistance = 10
+	announceSound.Playing = false
+	announceSound.Looped = false
+	announceSound.Volume = 0.3
+	announceSound.Parent = orb
+end
+
+function Orb.PlayNotificationSound(orb, changeSound)
+	if orb == nil then
+		print("[Orb] ERROR - Attempted to play notification sound on nil orb")
+		return
+	end
+
+	local sound = orb:FindFirstChild("Sound")
+	if sound then
+		if not sound.IsLoaded then sound.Loaded:Wait() end
+		sound:Play()
+
+		if changeSound then
+			local connection
+			connection = sound.Ended:Connect(function()
+				local soundId = math.random(1, #speakerAttachSounds)
+				sound.SoundId = "rbxassetid://" .. tostring(speakerAttachSounds[soundId])
+				connection:Disconnect()
+				connection = nil
+			end)
+		end
+	end
 end
 
 function Orb.RotateGhostToFaceSpeaker(orb, ghost)
