@@ -177,7 +177,7 @@ function Gui.Init()
             speakerPrompt.KeyboardKeyCode = Enum.KeyCode.F
             speakerPrompt.GamepadKeyCode = Enum.KeyCode.ButtonY
             speakerPrompt.ObjectText = "Orb"
-            proximityPrompt.RequiresLineOfSight = false
+            speakerPrompt.RequiresLineOfSight = false
             speakerPrompt.Enabled = Gui.HasSpeakerPermission
             speakerPrompt.Parent = orb
 
