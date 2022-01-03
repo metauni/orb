@@ -36,17 +36,7 @@ function Orb.Init()
 	end)
 
 	OrbDetachRemoteEvent.OnServerEvent:Connect(function(plr, orb)
-		Orb.RemoveListener(orb, plr.UserId)
-
-		-- If this user was the speaker, detaching means
-		-- they detached from being the speaker
-		if orb.Speaker.Value == plr.UserId then
-			Orb.SetSpeaker(orb, nil)
-			Orb.PlayDetachSpeakerSound(orb)
-
-			local plight = orb:FindFirstChild("PointLight")
-			if plight then plight.Enabled = false end
-		end
+		Orb.Detach(orb, plr.UserId)
 	end)
 
 	OrbAttachRemoteEvent.OnServerEvent:Connect(function(plr, orb)
@@ -99,7 +89,7 @@ function Orb.Init()
 
 	-- Remove leaving players as listeners and speakers
 	Players.PlayerRemoving:Connect(function(plr)
-		Orb.RemoveListenerFromAllOrbs(plr.UserId)
+		Orb.DetachPlayer(plr.UserId)
 	end)
 
 	-- Make waypoints invisible
@@ -184,6 +174,28 @@ function Orb.InitOrb(orb)
 	plight.Range = 8
 	plight.Enabled = false
 	plight.Parent = orb
+end
+
+function Orb.Detach(orb, playerId)
+	Orb.RemoveListener(orb, playerId)
+
+	-- If this user was the speaker, detaching means
+	-- they detached from being the speaker
+	if orb.Speaker.Value == playerId then
+		Orb.SetSpeaker(orb, nil)
+		Orb.PlayDetachSpeakerSound(orb)
+
+		local plight = orb:FindFirstChild("PointLight")
+		if plight then plight.Enabled = false end
+	end
+end
+
+function Orb.DetachPlayer(playerId)
+	local orbs = CollectionService:GetTagged(Config.ObjectTag)
+
+	for _, orb in ipairs(orbs) do
+		Orb.Detach(orb, playerId)
+	end
 end
 
 function Orb.PlayDetachSpeakerSound(orb)
@@ -468,14 +480,6 @@ function Orb.RemoveListener(orb, listenerID)
 	end
 
 	Orb.RemoveGhost(orb, listenerID)
-end
-
-function Orb.RemoveListenerFromAllOrbs(listenerID)
-	local orbs = CollectionService:GetTagged(Config.ObjectTag)
-
-	for _, orb in ipairs(orbs) do
-		Orb.RemoveListener(orb, listenerID)
-	end
 end
 
 function Orb.SetSpeaker(orb, speaker)
