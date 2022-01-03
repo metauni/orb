@@ -8,6 +8,7 @@ local Config = require(Common.Config)
 local OrbAttachRemoteEvent = Common.Remotes.OrbAttach
 local OrbDetachRemoteEvent = Common.Remotes.OrbDetach
 local OrbAttachSpeakerRemoteEvent = Common.Remotes.OrbAttachSpeaker
+local OrbDetachSpeakerRemoteEvent = Common.Remotes.OrbDetachSpeaker
 local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
 local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
 local OrbTweeningStartRemoteEvent = Common.Remotes.OrbTweeningStart
@@ -50,6 +51,11 @@ function Orb.Init()
 		if plight then plight.Enabled = true end
 
 		Orb.PlayAttachSpeakerSound(orb, true)
+
+		-- This event is fired from the client who is attaching as a 
+		-- speaker, but we now fire on all clients to tell them to
+		-- e.g. change their proximity prompts
+		OrbAttachSpeakerRemoteEvent:FireAllClients(orb, orb.Speaker.Value)
 	end)
 
 	OrbSpeakerMovedRemoteEvent.OnServerEvent:Connect(function(plr, orb)
@@ -187,6 +193,9 @@ function Orb.Detach(orb, playerId)
 
 		local plight = orb:FindFirstChild("PointLight")
 		if plight then plight.Enabled = false end
+
+		-- Notify clients that the speaker detached
+		OrbDetachSpeakerRemoteEvent:FireAllClients(orb, 0)
 	end
 end
 
@@ -483,7 +492,7 @@ function Orb.RemoveListener(orb, listenerID)
 end
 
 function Orb.SetSpeaker(orb, speaker)
-	if speaker and typeof(speaker) == "number" then
+	if speaker ~= nil then
 		orb.Speaker.Value = speaker
 	else
 		-- Set speaker to nil to disconnect a speaker

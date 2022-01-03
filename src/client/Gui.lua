@@ -14,6 +14,7 @@ local Config = require(Common.Config)
 local OrbAttachRemoteEvent = Common.Remotes.OrbAttach
 local OrbDetachRemoteEvent = Common.Remotes.OrbDetach
 local OrbAttachSpeakerRemoteEvent = Common.Remotes.OrbAttachSpeaker
+local OrbDetachSpeakerRemoteEvent = Common.Remotes.OrbDetachSpeaker
 local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
 local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
 local OrbTweeningStartRemoteEvent = Common.Remotes.OrbTweeningStart
@@ -70,8 +71,8 @@ function Gui.Init()
 
     detachButton.Activated:Connect(Gui.Detach)
     detachSpeakerButton.Activated:Connect(Gui.Detach)
-    OrbAttachRemoteEvent.OnClientEvent:Connect(Gui.Attach)
-    OrbAttachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.AttachSpeaker)
+    OrbAttachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.RefreshPrompts)
+    OrbDetachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.RefreshPrompts)
 
     -- 
     -- Teleporting
@@ -137,7 +138,7 @@ function Gui.Init()
                 -- If we are not currently attached as either or speaker
                 -- or listener, make the speaker prompt enabled
                 if speakerPrompt and not Gui.Orb == orb then
-                    speakerPrompt.Enabled = Gui.HasSpeakerPermission
+                    speakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == 0
                 end
             end
 		end)
@@ -230,6 +231,17 @@ function Gui.Init()
     OrbTweeningStopRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStop)
 
 	print("[Orb] Gui Initialised")
+end
+
+-- Refresh the visibility of the normal and speaker proximity prompts
+function Gui.RefreshPrompts(orb, speakerId)
+    local speakerPrompt = orb:FindFirstChild("SpeakerPrompt")
+
+    -- If we are not currently attached as either or speaker
+    -- or listener, make the speaker prompt enabled
+    if speakerPrompt ~= nil and Gui.Orb ~= orb then
+        speakerPrompt.Enabled = Gui.HasSpeakerPermission and speakerId == 0
+    end
 end
 
 -- A point of interest is any object tagged with either
@@ -437,7 +449,7 @@ function Gui.OrbTweeningStop(orb)
     -- Turn back on the proximity prompts, but only for orbs we're not attached to
     if orb ~= Gui.Orb then
         orb.NormalPrompt.Enabled = true
-        orb.SpeakerPrompt.Enabled = Gui.HasSpeakerPermission
+        orb.SpeakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == 0
     end
 
     orb:SetAttribute("tweening", false)

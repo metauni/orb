@@ -3,7 +3,7 @@ local Config = {
 	WaypointTag = "metaorb_waypoint",
 	PointOfInterestTag = "metaorb_poi",
 	DataStoreTag = "orb.",
-	Version = "0.2.2",
+	Version = "0.2.3",
 	TweenTime = 5,
 }
 
