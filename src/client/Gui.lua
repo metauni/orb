@@ -240,7 +240,7 @@ function Gui.RefreshPrompts(orb, speakerId)
     -- If we are not currently attached as either or speaker
     -- or listener, make the speaker prompt enabled
     if speakerPrompt ~= nil and Gui.Orb ~= orb then
-        speakerPrompt.Enabled = Gui.HasSpeakerPermission and speakerId == 0
+        speakerPrompt.Enabled = Gui.HasSpeakerPermission and speakerId == 0 and not orb:GetAttribute("tweening")
     end
 end
 
