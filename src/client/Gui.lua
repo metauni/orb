@@ -80,7 +80,6 @@ function Gui.Init()
     returnButton.Activated:Connect(function()
         -- Teleport us to our ghost
         OrbTeleportRemoteEvent:FireServer(Gui.Orb)
-        Gui.Detach()
     end)
 
     returnButtonSpeaker.Activated:Connect(function()

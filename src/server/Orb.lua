@@ -87,9 +87,8 @@ function Orb.Init()
 
 		if ghost ~= nil then
 			-- This is a user attached as listener
-			targetCFrame = ghost.PrimaryPart.CFrame
-			Orb.RemoveGhost(orb, plr.UserId)
-			wait(0.1)
+			targetCFrame = ghost.PrimaryPart.CFrame + Vector3.new(0, 10, 0)
+			-- Orb.RemoveGhost(orb, plr.UserId)
 		else
 			-- This is a speaker
 			targetCFrame = CFrame.new(orb.Position + Vector3.new(0,5 * orb.Size.Y,0))
