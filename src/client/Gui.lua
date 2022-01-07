@@ -41,15 +41,15 @@ function Gui.Init()
     Gui.Orbcam = false
     Gui.CameraTween = nil
 
-    listenButton = listenerGui.ListenButton
-    detachButton = listenerGui.DetachButton
-    detachSpeakerButton = speakerGui.DetachButton
-    returnButton = listenerGui.ReturnButton
-    peekButton = listenerGui.PeekButton
-    viewportFrame = listenerGui.ViewportFrame
-    speakerViewportFrame = speakerGui.ViewportFrame
-    returnButtonSpeaker = speakerGui.ReturnButton
-    peekButtonSpeaker = speakerGui.PeekButton
+    listenButton = listenerGui:WaitForChild("ListenButton")
+    detachButton = listenerGui:WaitForChild("DetachButton")
+    detachSpeakerButton = speakerGui:WaitForChild("DetachButton")
+    returnButton = listenerGui:WaitForChild("ReturnButton")
+    peekButton = listenerGui:WaitForChild("PeekButton")
+    viewportFrame = listenerGui:WaitForChild("ViewportFrame")
+    speakerViewportFrame = speakerGui:WaitForChild("ViewportFrame")
+    returnButtonSpeaker = speakerGui:WaitForChild("ReturnButton")
+    peekButtonSpeaker = speakerGui:WaitForChild("PeekButton")
 
     -- 
     -- Listening
@@ -253,7 +253,7 @@ function Gui.PointOfInterest()
     if Gui.Orb == nil then return end
 
     local boards = CollectionService:GetTagged("metaboard")
-    local pois = CollectionService:GetTagged("metaorb_poi")
+    local pois = CollectionService:GetTagged(Config.PointOfInterestTag)
 
     if #boards == 0 and #pois == 0 then return nil end
 
@@ -308,7 +308,7 @@ function Gui.PopulateViewport()
 	
     local orbCameraPos = Vector3.new(Gui.Orb.Position.X, poiPosition.Y, Gui.Orb.Position.Z)
 
-	viewportCamera.CFrame = CFrame.new( orbCameraPos, poiPosition )
+	viewportCamera.CFrame = CFrame.lookAt(orbCameraPos, poiPosition)
 end
 
 function Gui.ListenOn()
@@ -473,7 +473,7 @@ function Gui.OrbcamTweeningStart(newPos, poiPos)
     local orbCameraPos = Vector3.new(newPos.X, poiPos.Y, newPos.Z)
 
     Gui.CameraTween = TweenService:Create(camera, tweenInfo, 
-        {CFrame = CFrame.new(orbCameraPos, poiPos)})
+        {CFrame = CFrame.lookAt(orbCameraPos, poiPos)})
 
     Gui.CameraTween:Play()
 end
@@ -491,7 +491,7 @@ function Gui.OrbcamOn(guiOff)
 	end
 	
     local orbCameraPos = Vector3.new(Gui.Orb.Position.X, poiPos.Y, Gui.Orb.Position.Z)
-	camera.CFrame = CFrame.new(orbCameraPos,poiPos)
+	camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
     
     if guiOff then
         speakerGui.Enabled = false
