@@ -47,7 +47,7 @@ function Gui.Init()
     Gui.CameraTween = nil
 
     SoundService:SetListener(Enum.ListenerType.Camera)
-    
+
     listenButton = listenerGui:WaitForChild("ListenButton")
     detachButton = listenerGui:WaitForChild("DetachButton")
     detachSpeakerButton = speakerGui:WaitForChild("DetachButton")
@@ -419,6 +419,8 @@ function Gui.Attach(orb)
     
     listenerGui.Enabled = true
     Gui.Orb = orb
+
+    Gui.ListenOn()
 end
 
 -- 
