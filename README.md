@@ -28,13 +28,19 @@ Some notes:
 
 * If the Proximity Prompts don't appear when you are near the orb, try moving it further out of the ground (the prompts will not appear unless there is a line of sight to the position of the orb).
 
-## Usage
+## Philosophy
 
-Here's a scenario: two masters students graduated from the same University, have similar interests, but haven't seen each other in a while and have moved to different continents since then. They show up for a metauni day session (maybe Foundations) and while wandering around to sit on a floating ring while listening through an orb, they notice each other and disconnect from listening in order to chat about what they're working on now. An hour later they're still talking math, not even noticing that the event ended.
+The values guiding the design of the orb system and the use of spatial voice in metauni:
 
-In this scenario the ability to wander off in listener mode **lowers the activation energy for informal social interaction around mathematics**. I think people are much less likely to break out their personal boards and start chatting in the middle of the talk venue, because it feels kinda rude and they might be in the way. But off in some cave or corner of the world it feels OK.
+1. **Speakers are better with an audience**: especially in a virtual format, it is important for the speaker to see that people are there and actively listening.
 
-Lowering this activation energy seems important, and is the main purpose of the Orbs.
+2. **Sometimes you think better on your feet**: when you are trying to process something difficult, or take a step out into the unknown, going for a walk and finding a nice view might help. That doesn't mean you want to stop listening!
+
+3. **Lowering barriers to informal social interaction**: two people show up for a metauni event and while listening wander off to check out something interesting in the world. They notice each other and (reversibly) stop listening to the talk to say Hi. This grows into a conversation (Bob: "Knots are cool" Alice:"I agree, let's climb it").
+
+4. **Right to know who is listening**: in physical space you can cheaply compute an estimate of who can hear you (it's called "looking around"). A system like spatial voice which tempts you to apply the same heuristics shouldn't then violate them. If someone is getting an audio feed from a location, there should be a very clear indicator that this is the case.
+
+5. **Recording should be easy**: most talks ever given are lost and that's a shame. Making it easy to produce and share high quality recordings of mathematics is a core value of metauni.
 
 ## Generating a Release
 
