@@ -34,12 +34,19 @@ function Gui.Init()
     speakerGui = localPlayer.PlayerGui:WaitForChild("OrbGuiSpeaker",math.huge)
     Gui.Listening = false
     Gui.Speaking = false
+
+    if Gui.Orb then
+        print("[orb] WARNING: Gui.Orb was non-nil on Init")
+    end
+
     Gui.Orb = nil
     Gui.RunningConnection = nil
     Gui.ViewportOn = false
     Gui.HasSpeakerPermission = true -- can attach as speaker?
     Gui.Orbcam = false
     Gui.CameraTween = nil
+
+    SoundService:SetListener(Enum.ListenerType.Camera)
 
     listenButton = listenerGui.ListenButton
     detachButton = listenerGui.DetachButton
@@ -325,10 +332,7 @@ end
 function Gui.ListenOff()
     Gui.Listening = false
     listenButton.BackgroundTransparency = 0.75
-
-    if Gui.Orb then
-        SoundService:SetListener(Enum.ListenerType.Camera)
-    end
+    SoundService:SetListener(Enum.ListenerType.Camera)
 end
 
 -- Detach, as listener or speaker

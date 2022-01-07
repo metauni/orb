@@ -10,10 +10,12 @@ local Common = game:GetService("ReplicatedStorage").OrbCommon
 local Config = require(Common.Config)
 
 if localCharacter then
+	-- When joining the game
 	Gui.Init()
 end
 
 Players.LocalPlayer.CharacterAdded:Connect(function(character)
+	-- When resetting
 	Gui.Init()
 end)
 
