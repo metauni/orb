@@ -20,7 +20,6 @@ local speakerAttachSoundIds = { 7873470625, 7873470425,
 local speakerDetachSoundId = 7864770869
 
 local Orb = {}
-Orb.__index = Orb
 
 function Orb.Init()
 	-- Offset of ghosts from orbs (playedID -> Vector3)
@@ -90,7 +89,7 @@ function Orb.Init()
 			targetCFrame = CFrame.new(orb.Position + Vector3.new(0,5 * orb.Size.Y,0))
 		end
 
-		plr.Character.PrimaryPart.CFrame = targetCFrame
+		plr.Character:PivotTo(targetCFrame)
 	end)
 
 	-- Remove leaving players as listeners and speakers
@@ -145,7 +144,7 @@ function Orb.InitOrb(orb)
 	waypoint.Transparency = 1
 	waypoint.Anchored = true
 	waypoint.CanCollide = false
-	CollectionService:AddTag(waypoint, "metaorb_waypoint")
+	CollectionService:AddTag(waypoint, Config.WaypointTag)
 	waypoint.Parent = orb
 
 	-- Sound to announce speaker attachment
@@ -261,9 +260,9 @@ function Orb.RotateGhostToFaceSpeaker(orb, ghost)
 		0 -- DelayTime
 	)
 
-	local ghostTween = TweenService:Create(ghost.PrimaryPart, tweenInfo, 
-		{CFrame = CFrame.new(ghostPos,speakerPosXZ)})
-	
+	local ghostTween = TweenService:Create(ghost.PrimaryPart, tweenInfo,
+		{CFrame = CFrame.lookAt(ghostPos, speakerPosXZ)})
+
 	ghostTween:Play()
 end
 
@@ -306,7 +305,7 @@ function Orb.WalkGhosts(orb, pos)
 				if not reached then
 					local speakerPos = Orb.GetSpeakerPosition(orb)
 					if speakerPos ~= nil then
-						ghost.PrimaryPart.CFrame = CFrame.new(newPos, speakerPos)
+						ghost:PivotTo(CFrame.lookAt(newPos, speakerPos))
 					else
 						ghost.PrimaryPart.Position = newPos
 					end
@@ -369,7 +368,7 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 		local orbTween
 		if poiPos ~= nil then
 			orbTween = TweenService:Create(orb, tweenInfo, 
-				{CFrame = CFrame.new(minWaypoint.Position, poiPos)})
+				{CFrame = CFrame.lookAt(minWaypoint.Position, poiPos)})
 		else
 			orbTween = TweenService:Create(orb, tweenInfo, 
 				{Position = minWaypoint.Position})
@@ -412,9 +411,9 @@ function Orb.AddGhost(orb, playerId)
 		local speakerPos = Orb.GetSpeakerPosition(orb)
 		if speakerPos then
 			local speakerPosXZ = Vector3.new(speakerPos.X,ghostPos.Y,speakerPos.Z)
-			ghost:SetPrimaryPartCFrame(CFrame.new(ghostPos,speakerPosXZ))
+			ghost:PivotTo(CFrame.lookAt(ghostPos, speakerPosXZ))
 		else
-			ghost:SetPrimaryPartCFrame(CFrame.new(ghostPos, character.PrimaryPart.Position))
+			ghost:PivotTo(CFrame.lookAt(ghostPos, character.PrimaryPart.Position))
 		end
 
 		for _, desc in ipairs(ghost:GetDescendants()) do
@@ -516,7 +515,7 @@ end
 -- a BasePart or a Model with non-nil PrimaryPart
 function Orb.PointOfInterest(targetPos)
     local boards = CollectionService:GetTagged("metaboard")
-    local pois = CollectionService:GetTagged("metaorb_poi")
+    local pois = CollectionService:GetTagged(Config.PointOfInterestTag)
 
     if #boards == 0 and #pois == 0 then return nil end
 
