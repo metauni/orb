@@ -10,7 +10,7 @@ Orbs are audiovisual devices with the following features:
 
 There is an [introductory video](https://youtu.be/0vuNKcCv1sk). In more detail
 
-* An *orb* is any `BasePart` with the tag `metaorb`
+* An *orb* is any `BasePart` or `Model` (with non-nil `PrimaryPart`) with the tag `metaorb`
 * A *waypoint* is any `BasePart` with the tag `metaorb_waypoint`
 * A *point of interest* is any `BasePart` or `Model` (with non-nil `PrimaryPart`) with the tag `metaorb_poi` or `metaboard`.
 

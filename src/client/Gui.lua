@@ -21,8 +21,9 @@ local OrbTweeningStartRemoteEvent = Common.Remotes.OrbTweeningStart
 local OrbTweeningStopRemoteEvent = Common.Remotes.OrbTweeningStop
 
 local listenerGui, speakerGui, listenButton, detachButton, returnButton
-local viewportFrame, peekButton, detachSpeakerButton, speakerViewportFrame
-local returnButtonSpeaker, peekButtonSpeaker
+local peekButton, detachSpeakerButton, speakerViewportFrame
+local returnButtonSpeaker, peekButtonSpeaker, luggageGui
+local peekButtonLuggage, detachLuggageButton
 local localPlayer
 
 local Gui = {}
@@ -32,6 +33,7 @@ function Gui.Init()
     localPlayer = Players.LocalPlayer
     listenerGui = localPlayer.PlayerGui:WaitForChild("OrbGui",math.huge)
     speakerGui = localPlayer.PlayerGui:WaitForChild("OrbGuiSpeaker",math.huge)
+    luggageGui = localPlayer.PlayerGui:WaitForChild("OrbGuiLuggage",math.huge)
     Gui.Listening = false
     Gui.Speaking = false
 
@@ -53,10 +55,11 @@ function Gui.Init()
     detachSpeakerButton = speakerGui:WaitForChild("DetachButton")
     returnButton = listenerGui:WaitForChild("ReturnButton")
     peekButton = listenerGui:WaitForChild("PeekButton")
-    viewportFrame = listenerGui:WaitForChild("ViewportFrame")
     speakerViewportFrame = speakerGui:WaitForChild("ViewportFrame")
     returnButtonSpeaker = speakerGui:WaitForChild("ReturnButton")
     peekButtonSpeaker = speakerGui:WaitForChild("PeekButton")
+    peekButtonLuggage = luggageGui:WaitForChild("PeekButton")
+    detachLuggageButton = luggageGui:WaitForChild("DetachButton")
 
     -- 
     -- Listening
@@ -78,6 +81,7 @@ function Gui.Init()
 
     detachButton.Activated:Connect(Gui.Detach)
     detachSpeakerButton.Activated:Connect(Gui.Detach)
+    detachLuggageButton.Activated:Connect(Gui.Detach)
     OrbAttachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.RefreshPrompts)
     OrbDetachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.RefreshPrompts)
 
@@ -99,24 +103,26 @@ function Gui.Init()
     -- Viewport
     --
 
-    peekButton.Activated:Connect(function()
+    local function peekButtonActivated(button)
         Gui.ToggleOrbcam(false)
 
         if Gui.Orbcam then
-            peekButton.BackgroundColor3 = Color3.new(1,1,1)
+            button.BackgroundColor3 = Color3.new(1,1,1)
         else
-            peekButton.BackgroundColor3 = Color3.new(0,0,0)
+            button.BackgroundColor3 = Color3.new(0,0,0)
         end
+    end
+
+    peekButton.Activated:Connect(function()
+        peekButtonActivated(peekButton)
     end)
 
     peekButtonSpeaker.Activated:Connect(function()
-        Gui.ToggleOrbcam(false)
+        peekButtonActivated(peekButtonSpeaker)
+    end)
 
-        if Gui.Orbcam then
-            peekButtonSpeaker.BackgroundColor3 = Color3.new(1,1,1)
-        else
-            peekButtonSpeaker.BackgroundColor3 = Color3.new(0,0,0)
-        end
+    peekButtonLuggage.Activated:Connect(function()
+        peekButtonActivated(peekButtonLuggage)
     end)
 
     -- If the Admin system is installed, the permission specified there
@@ -140,7 +146,7 @@ function Gui.Init()
             -- Update the visibility of speaker prompts
             local orbs = CollectionService:GetTagged(Config.ObjectTag)
             for _, orb in ipairs(orbs) do
-                local speakerPrompt = orb:FindFirstChild("SpeakerPrompt")
+                local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
 
                 -- If we are not currently attached as either or speaker
                 -- or listener, make the speaker prompt enabled
@@ -156,25 +162,49 @@ function Gui.Init()
         Gui.HasSpeakerPermission = true
     end
 
-    -- Install proximity prompts
+    -- Install proximity prompts (note that this gets called again after player reset)
     local orbs = CollectionService:GetTagged(Config.ObjectTag)
     for _, orb in ipairs(orbs) do
-        -- Attach proximity prompts
-        local proximityPrompt = orb:FindFirstChild("NormalPrompt")
-        local speakerPrompt = orb:FindFirstChild("SpeakerPrompt")
+        local luggagePrompt = if orb:IsA("BasePart") then orb:FindFirstChild("LuggagePrompt") else orb.PrimaryPart:FindFirstChild("LuggagePrompt")
+        if luggagePrompt == nil and CollectionService:HasTag(orb, Config.TransportTag) then
+            luggagePrompt = Instance.new("ProximityPrompt")
+            luggagePrompt.Name = "LuggagePrompt"
+            luggagePrompt.ActionText = "Attach as Luggage"
+            luggagePrompt.MaxActivationDistance = 8
+            luggagePrompt.HoldDuration = 1
+            luggagePrompt.ObjectText = "Orb"
+            luggagePrompt.RequiresLineOfSight = false
+            luggagePrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
-        -- Note that this gets called again after player reset
-        if proximityPrompt == nil and speakerPrompt == nil then
-            proximityPrompt = Instance.new("ProximityPrompt")
-            proximityPrompt.Name = "NormalPrompt"
-            proximityPrompt.ActionText = "Attach as Listener"
-            proximityPrompt.MaxActivationDistance = 8
-            proximityPrompt.HoldDuration = 1
-            proximityPrompt.ObjectText = "Orb"
-            proximityPrompt.RequiresLineOfSight = false
-            proximityPrompt.Parent = orb
+            ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
+                if prompt == luggagePrompt and prompt.Name == "LuggagePrompt" then
+                    OrbAttachRemoteEvent:FireServer(orb)
+                    Gui.Attach(orb)
+                end
+            end)
+        end
 
-            -- Attach speaker prompts
+        local normalPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("NormalPrompt") else orb.PrimaryPart:FindFirstChild("NormalPrompt")
+        if normalPrompt == nil and not CollectionService:HasTag(orb, Config.TransportTag) then
+            normalPrompt = Instance.new("ProximityPrompt")
+            normalPrompt.Name = "NormalPrompt"
+            normalPrompt.ActionText = "Attach as Listener"
+            normalPrompt.MaxActivationDistance = 8
+            normalPrompt.HoldDuration = 1
+            normalPrompt.ObjectText = "Orb"
+            normalPrompt.RequiresLineOfSight = false
+            normalPrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+
+            ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
+                if prompt == normalPrompt and prompt.Name == "NormalPrompt" then
+                    OrbAttachRemoteEvent:FireServer(orb)
+                    Gui.Attach(orb)
+                end
+            end)
+        end
+
+        local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
+        if speakerPrompt == nil and not CollectionService:HasTag(orb, Config.TransportTag) then
             speakerPrompt = Instance.new("ProximityPrompt")
             speakerPrompt.Name = "SpeakerPrompt"
             speakerPrompt.ActionText = "Attach as Speaker"
@@ -186,15 +216,10 @@ function Gui.Init()
             speakerPrompt.ObjectText = "Orb"
             speakerPrompt.RequiresLineOfSight = false
             speakerPrompt.Enabled = Gui.HasSpeakerPermission
-            speakerPrompt.Parent = orb
+            speakerPrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
             ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
-                if prompt.Parent == orb and prompt.Name == "NormalPrompt" then
-                    OrbAttachRemoteEvent:FireServer(orb)
-                    Gui.Attach(orb)
-                end
-    
-                if prompt.Parent == orb and prompt.Name == "SpeakerPrompt" then
+                if prompt == speakerPrompt and prompt.Name == "SpeakerPrompt" then
                     -- Only allow someone to attach if there is no current speaker
                     if orb.Speaker.Value == 0 then
                         OrbAttachSpeakerRemoteEvent:FireServer(orb)
@@ -242,7 +267,7 @@ end
 
 -- Refresh the visibility of the normal and speaker proximity prompts
 function Gui.RefreshPrompts(orb, speakerId)
-    local speakerPrompt = orb:FindFirstChild("SpeakerPrompt")
+    local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
 
     -- If we are not currently attached as either or speaker
     -- or listener, make the speaker prompt enabled
@@ -270,19 +295,14 @@ function Gui.PointOfInterest()
     local minDistance = math.huge
 
     local families = {boards, pois}
+    local orbPos = Gui.Orb:GetPivot().Position
 
     for _, family in ipairs(families) do
         for _, p in ipairs(family) do
-            local pos = nil
-
-            if p:IsA("BasePart") then
-                pos = p.Position
-            elseif p:IsA("Model") and p.PrimaryPart ~= nil then
-                pos = p.PrimaryPart.Position
-            end
+            local pos = p:GetPivot().Position
 
             if pos ~= nil then
-                local distance = (pos - Gui.Orb.Position).Magnitude
+                local distance = (pos - orbPos).Magnitude
                 if distance < minDistance then
                     minDistance = distance
                     closestPos = pos
@@ -293,29 +313,6 @@ function Gui.PointOfInterest()
     end
 
     return closestPoi, closestPos
-end
-
-function Gui.PopulateViewport()
-    viewportFrame:ClearAllChildren()
-
-    if Gui.Orb == nil then return end
-    local pointOfInterest, poiPosition = Gui.PointOfInterest()
-    if pointOfInterest == nil or poiPosition == nil then return end
-
-    -- Copy the point of interest and put it into the viewport
-    local poiCopy = pointOfInterest:Clone()
-    for _, tag in ipairs(CollectionService:GetTags(poiCopy)) do
-        CollectionService:RemoveTag(poiCopy, tag)
-    end
-    poiCopy.Parent = viewportFrame
-	
-	local viewportCamera = Instance.new("Camera")
-	viewportFrame.CurrentCamera = viewportCamera
-	viewportCamera.Parent = viewportFrame
-	
-    local orbCameraPos = Vector3.new(Gui.Orb.Position.X, poiPosition.Y, Gui.Orb.Position.Z)
-
-	viewportCamera.CFrame = CFrame.lookAt(orbCameraPos, poiPosition)
 end
 
 function Gui.ListenOn()
@@ -340,23 +337,31 @@ function Gui.Detach()
     if not Gui.Orb then return end
     local orb = Gui.Orb
 
-    -- If the orb is currently on the move, do not enable it yet
-    if not orb:GetAttribute("tweening") then
-        orb.NormalPrompt.Enabled = true
-        orb.SpeakerPrompt.Enabled = Gui.HasSpeakerPermission
-    end
+    if CollectionService:HasTag(orb, Config.TransportTag) then
+        luggageGui.Enabled = false
+        local luggagePrompt = if orb:IsA("BasePart") then orb.LuggagePrompt else orb.PrimaryPart.LuggagePrompt
+        luggagePrompt.Enabled = true
+    else
+        -- If the orb is currently on the move, do not enable it yet
+        if not orb:GetAttribute("tweening") then
+            local normalPrompt = if orb:IsA("BasePart") then orb.NormalPrompt else orb.PrimaryPart.NormalPrompt
+            local speakerPrompt = if orb:IsA("BasePart") then orb.SpeakerPrompt else orb.PrimaryPart.SpeakerPrompt
+            normalPrompt.Enabled = true
+            speakerPrompt.Enabled = Gui.HasSpeakerPermission
+        end
 
-    Gui.ListenOff()
-    Gui.OrbcamOff()
-    Gui.Speaking = false
-    listenerGui.Enabled = false
-    speakerGui.Enabled = false
-    peekButton.BackgroundColor3 = Color3.new(0,0,0)
-    peekButtonSpeaker.BackgroundColor3 = Color3.new(0,0,0)
+        Gui.ListenOff()
+        Gui.OrbcamOff()
+        Gui.Speaking = false
+        listenerGui.Enabled = false
+        speakerGui.Enabled = false
+        peekButton.BackgroundColor3 = Color3.new(0,0,0)
+        peekButtonSpeaker.BackgroundColor3 = Color3.new(0,0,0)
 
-    if Gui.RunningConnection then
-        Gui.RunningConnection:Disconnect()
-        Gui.RunningConnection = nil
+        if Gui.RunningConnection then
+            Gui.RunningConnection:Disconnect()
+            Gui.RunningConnection = nil
+        end
     end
 
     OrbDetachRemoteEvent:FireServer(orb)
@@ -376,18 +381,21 @@ function Gui.PopulateViewportSpeaker()
     end
 
     -- Get rid of waypoints and such
-    orbClone:ClearAllChildren()
+    -- orbClone:ClearAllChildren()
 
-    orbClone.Position = Vector3.new(0,0,0)
+    orbClone:PivotTo(CFrame.new(0,0,0))
     orbClone.Name = "Orb"
     orbClone.Parent = speakerViewportFrame
-    speakerViewportFrame.Camera.CFrame = CFrame.new(orbClone.Position + Vector3.new(0, 1.3 * orbClone.Size.Y, 0), orbClone.Position)
+    local orbSize = if orbClone:IsA("BasePart") then orbClone.Size else orbClone.PrimaryPart.Size
+    speakerViewportFrame.Camera.CFrame = CFrame.new(Vector3.new(0, 1.3 * orbSize.Y, 0), Vector3.new(0,0,0))
 end
 
 function Gui.AttachSpeaker(orb)
     -- Disable the proximity prompt
-    orb.NormalPrompt.Enabled = false
-    orb.SpeakerPrompt.Enabled = false
+    local normalPrompt = if orb:IsA("BasePart") then orb.NormalPrompt else orb.PrimaryPart.NormalPrompt
+    local speakerPrompt = if orb:IsA("BasePart") then orb.SpeakerPrompt else orb.PrimaryPart.SpeakerPrompt
+    normalPrompt.Enabled = false
+    speakerPrompt.Enabled = false
     
     -- Disconnect from the old source if there is one
     if Gui.Orb then Gui.Detach() end
@@ -410,17 +418,23 @@ function Gui.AttachSpeaker(orb)
 end
 
 function Gui.Attach(orb)
-    -- Disable the proximity prompt
-    orb.NormalPrompt.Enabled = false
-    orb.SpeakerPrompt.Enabled = false
-
     -- Disconnect from the old source if there is one
     if Gui.Orb then Gui.Detach() end
-    
-    listenerGui.Enabled = true
     Gui.Orb = orb
 
-    Gui.ListenOn()
+    if CollectionService:HasTag(orb, Config.TransportTag) then
+        local luggagePrompt = if orb:IsA("BasePart") then orb.LuggagePrompt else orb.PrimaryPart.LuggagePrompt
+        luggagePrompt.Enabled = false
+        luggageGui.Enabled = true
+    else
+        -- Disable the proximity prompt
+        local normalPrompt = if orb:IsA("BasePart") then orb.NormalPrompt else orb.PrimaryPart.NormalPrompt
+        local speakerPrompt = if orb:IsA("BasePart") then orb.SpeakerPrompt else orb.PrimaryPart.SpeakerPrompt
+        normalPrompt.Enabled = false
+        speakerPrompt.Enabled = false
+        listenerGui.Enabled = true
+        Gui.ListenOn()
+    end
 end
 
 -- 
@@ -446,16 +460,20 @@ function Gui.OrbTweeningStart(orb, newPos, poiPos)
     end
 
     -- Turn off proximity prompts on this orb
-    orb.NormalPrompt.Enabled = false
-    orb.SpeakerPrompt.Enabled = false
+    local normalPrompt = if orb:IsA("BasePart") then orb.NormalPrompt else orb.PrimaryPart.NormalPrompt
+    local speakerPrompt = if orb:IsA("BasePart") then orb.SpeakerPrompt else orb.PrimaryPart.SpeakerPrompt
+    normalPrompt.Enabled = false
+    speakerPrompt.Enabled = false
     orb:SetAttribute("tweening", true)
 end
 
 function Gui.OrbTweeningStop(orb)
     -- Turn back on the proximity prompts, but only for orbs we're not attached to
     if orb ~= Gui.Orb then
-        orb.NormalPrompt.Enabled = true
-        orb.SpeakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == 0
+        local normalPrompt = if orb:IsA("BasePart") then orb.NormalPrompt else orb.PrimaryPart.NormalPrompt
+        local speakerPrompt = if orb:IsA("BasePart") then orb.SpeakerPrompt else orb.PrimaryPart.SpeakerPrompt
+        normalPrompt.Enabled = true
+        speakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == 0
     end
 
     orb:SetAttribute("tweening", false)
@@ -496,12 +514,19 @@ function Gui.OrbcamOn(guiOff)
 		camera.CameraType = Enum.CameraType.Scriptable
 	end
 	
-    local orbCameraPos = Vector3.new(Gui.Orb.Position.X, poiPos.Y, Gui.Orb.Position.Z)
+    local orbPos = Gui.Orb:GetPivot().Position
+
+    local orbCameraPos = Vector3.new(orbPos.X, poiPos.Y, orbPos.Z)
 	camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
     
     if guiOff then
-        speakerGui.Enabled = false
-        listenerGui.Enabled = false
+        if CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
+            luggageGui.Enabled = false
+        else
+            speakerGui.Enabled = false
+            listenerGui.Enabled = false
+        end
+
         StarterGui:SetCore("TopbarEnabled", false)
     end
 
@@ -512,10 +537,14 @@ function Gui.OrbcamOff(guiOff)
 	if Gui.CameraTween then Gui.CameraTween:Cancel() end
 
     if guiOff then
-        if Gui.Speaking then
-            speakerGui.Enabled = true
-        elseif Gui.Orb ~= nil then
-            listenerGui.Enabled = true
+        if CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
+            luggageGui.Enabled = true
+        else
+            if Gui.Speaking then
+                speakerGui.Enabled = true
+            elseif Gui.Orb ~= nil then
+                listenerGui.Enabled = true
+            end
         end
 
 	    StarterGui:SetCore("TopbarEnabled", true)
@@ -525,7 +554,9 @@ function Gui.OrbcamOff(guiOff)
 	camera.CameraType = Enum.CameraType.Custom
 
     if Gui.Speaking then speakerGui.Enabled = true end
-    if Gui.Orb ~= nil and not Gui.Speaking then listenerGui.Enabled = true end
+    if Gui.Orb ~= nil and not Gui.Speaking and not CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
+        listenerGui.Enabled = true
+    end
 	
 	resetCameraSubject()
     Gui.Orbcam = false

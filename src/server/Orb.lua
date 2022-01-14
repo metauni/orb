@@ -40,13 +40,13 @@ function Orb.Init()
 	end)
 
 	OrbAttachRemoteEvent.OnServerEvent:Connect(function(plr, orb)
-		Orb.AddListener(orb, plr.UserId)
+		Orb.Attach(orb, plr.UserId)
 	end)
 
 	OrbAttachSpeakerRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		Orb.SetSpeaker(orb, plr.UserId)
 		
-		local plight = orb:FindFirstChild("PointLight")
+		local plight = if orb:IsA("BasePart") then orb:FindFirstChild("PointLight") else orb.PrimaryPart:FindFirstChild("PointLight")
 		if plight then plight.Enabled = true end
 
 		Orb.PlayAttachSpeakerSound(orb, true)
@@ -64,7 +64,7 @@ function Orb.Init()
 		local waypointPos = Orb.TweenOrbToNearPosition(orb, playerPos)
 
 		if waypointPos then
-			if (waypointPos - orb.Position).Magnitude > 0.01 then
+			if (waypointPos - orb:GetPivot().Position).Magnitude > 0.01 then
 				Orb.WalkGhosts(orb, waypointPos)
 			else
 				Orb.RotateGhosts(orb)
@@ -86,7 +86,8 @@ function Orb.Init()
 			-- Orb.RemoveGhost(orb, plr.UserId)
 		else
 			-- This is a speaker
-			targetCFrame = CFrame.new(orb.Position + Vector3.new(0,5 * orb.Size.Y,0))
+			local orbSize = if orb:IsA("BasePart") then orb.Size else orb.PrimaryPart.Size
+			targetCFrame = CFrame.new(orb:GetPivot().Position + Vector3.new(0,5 * orbSize.Y,0))
 		end
 
 		plr.Character:PivotTo(targetCFrame)
@@ -138,7 +139,7 @@ function Orb.InitOrb(orb)
 
     -- Make a waypoint at the position of every orb
 	local waypoint = Instance.new("Part")
-	waypoint.Position = orb.Position
+	waypoint.Position = orb:GetPivot().Position
 	waypoint.Name = "OriginWaypoint"
 	waypoint.Size = Vector3.new(1,1,1)
 	waypoint.Transparency = 1
@@ -158,7 +159,7 @@ function Orb.InitOrb(orb)
 	announceSound.Playing = false
 	announceSound.Looped = false
 	announceSound.Volume = 0.3
-	announceSound.Parent = orb
+	announceSound.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
 	-- Sound to announce speaker attachment
 	local detachSpeakerSound = Instance.new("Sound")
@@ -170,7 +171,7 @@ function Orb.InitOrb(orb)
 	detachSpeakerSound.Playing = false
 	detachSpeakerSound.Looped = false
 	detachSpeakerSound.Volume = 0.3
-	detachSpeakerSound.Parent = orb
+	detachSpeakerSound.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
 	-- Light
 	local plight = Instance.new("PointLight")
@@ -178,23 +179,85 @@ function Orb.InitOrb(orb)
 	plight.Brightness = 1.5
 	plight.Range = 8
 	plight.Enabled = false
-	plight.Parent = orb
+	plight.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+end
+
+function Orb.AddLuggage(orb, playerId)
+	local plr = Players:GetPlayerByUserId(playerId)
+	if not plr then return end
+
+	-- Make rope
+	local attach0 = Instance.new("Attachment")
+	attach0.Name = "Attachment0" .. tostring(playerId)
+	attach0.Orientation = Vector3.new(0,0,-90)
+	attach0.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+	local orbSize = if orb:IsA("BasePart") then orb.Size else orb.PrimaryPart.Size
+	attach0.Position = Vector3.new(0,-orbSize.Y/2, 0)
+
+	local attach1 = Instance.new("Attachment")
+	attach1.Name = "TransportOrbAttachment1"
+	attach1.Orientation = Vector3.new(0,0,-90)
+	attach1.Parent = plr.Character.PrimaryPart
+	attach1.Position = Vector3.new(0,0,0)
+
+	local rope = Instance.new("RopeConstraint")
+	rope.Name = "RopeConstraint" .. tostring(playerId)
+	rope.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+	rope.Attachment0 = attach0
+	rope.Attachment1 = attach1
+	rope.Length = 13
+	rope.Visible = true
+end
+
+function Orb.RemoveLuggage(orb, playerId)
+	local plr = Players:GetPlayerByUserId(playerId)
+	if not plr then return end
+
+	local attachName = "Attachment0" .. tostring(playerId)
+	local attach0 = if orb:IsA("BasePart") then orb:FindFirstChild(attachName) else orb.PrimaryPart:FindFirstChild(attachName)
+	if attach0 then
+		attach0:Destroy()
+	end
+
+	-- WARNING: if you are attached to two orbs, this might destroy the wrong thing
+	local attach1 = plr.Character.PrimaryPart:FindFirstChild("TransportOrbAttachment1")
+	if attach1 then
+		attach1:Destroy()
+	end
+
+	local ropeName = "RopeConstraint"..tostring(playerId)
+	local rope = if orb:IsA("BasePart") then orb:FindFirstChild(ropeName) else orb.PrimaryPart:FindFirstChild(ropeName)
+	if rope then
+		rope:Destroy()
+	end
+end
+
+function Orb.Attach(orb, playerId)
+	if CollectionService:HasTag(orb, Config.TransportTag) then
+		Orb.AddLuggage(orb, playerId)
+	else
+		Orb.AddListener(orb, playerId)
+	end
 end
 
 function Orb.Detach(orb, playerId)
-	Orb.RemoveListener(orb, playerId)
+	if CollectionService:HasTag(orb, Config.TransportTag) then
+		Orb.RemoveLuggage(orb, playerId)
+	else
+		Orb.RemoveListener(orb, playerId)
 
-	-- If this user was the speaker, detaching means
-	-- they detached from being the speaker
-	if orb.Speaker.Value == playerId then
-		Orb.SetSpeaker(orb, nil)
-		Orb.PlayDetachSpeakerSound(orb)
+		-- If this user was the speaker, detaching means
+		-- they detached from being the speaker
+		if orb.Speaker.Value == playerId then
+			Orb.SetSpeaker(orb, nil)
+			Orb.PlayDetachSpeakerSound(orb)
 
-		local plight = orb:FindFirstChild("PointLight")
-		if plight then plight.Enabled = false end
+			local plight = if orb:IsA("BasePart") then orb:FindFirstChild("PointLight") else orb.PrimaryPart:FindFirstChild("PointLight")
+			if plight then plight.Enabled = false end
 
-		-- Notify clients that the speaker detached
-		OrbDetachSpeakerRemoteEvent:FireAllClients(orb, 0)
+			-- Notify clients that the speaker detached
+			OrbDetachSpeakerRemoteEvent:FireAllClients(orb, 0)
+		end
 	end
 end
 
@@ -212,7 +275,7 @@ function Orb.PlayDetachSpeakerSound(orb)
 		return
 	end
 
-	local sound = orb:FindFirstChild("DetachSound")
+	local sound = if orb:IsA("BasePart") then orb:FindFirstChild("DetachSound") else orb.PrimaryPart:FindFirstChild("DetachSound")
 	if sound then
 		if not sound.IsLoaded then sound.Loaded:Wait() end
 		sound:Play()
@@ -225,7 +288,7 @@ function Orb.PlayAttachSpeakerSound(orb, changeSound)
 		return
 	end
 
-	local sound = orb:FindFirstChild("AttachSound")
+	local sound = if orb:IsA("BasePart") then orb:FindFirstChild("AttachSound") else orb.PrimaryPart:FindFirstChild("AttachSound")
 	if sound then
 		if not sound.IsLoaded then sound.Loaded:Wait() end
 		sound:Play()
@@ -282,7 +345,7 @@ function Orb.WalkGhosts(orb, pos)
 		if offset ~= nil then
 			newPos = pos + offset
 		else
-			newPos = pos - orb.Position + ghost.PrimaryPart.Position
+			newPos = pos - orb:GetPivot().Position + ghost.PrimaryPart.Position
 		end
 		
 		-- If we're already on our way, don't repeat it
@@ -324,7 +387,7 @@ end
 function Orb.TweenOrbToNearPosition(orb, pos)
 	local waypoints = CollectionService:GetTagged(Config.WaypointTag)
 
-	if #waypoints == 0 then return orb.Position end
+	if #waypoints == 0 then return orb:GetPivot().Position end
 
 	-- Find the closest waypoint to the new position
 	-- and move the orb there
@@ -341,16 +404,16 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 
 	if minWaypoint then
 		-- If we are already there, don't tween
-		if (minWaypoint.Position - orb.Position).Magnitude < 0.01 then
-			return orb.Position
+		if (minWaypoint.Position - orb:GetPivot().Position).Magnitude < 0.01 then
+			return orb:GetPivot().Position
 		end
 
 		-- If there is an orb already there, don't tween
 		local orbs = CollectionService:GetTagged(Config.ObjectTag)
 
 		for _, otherOrb in ipairs(orbs) do
-			if otherOrb ~= orb and (minWaypoint.Position - otherOrb.Position).Magnitude < 0.01 then
-				return orb.Position
+			if otherOrb ~= orb and (minWaypoint.Position - otherOrb:GetPivot().Position).Magnitude < 0.01 then
+				return orb:GetPivot().Position
 			end
 		end
 
@@ -366,11 +429,13 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 		local poiPos = Orb.PointOfInterest(minWaypoint.Position)
 		
 		local orbTween
+		local orbToTween = if orb:IsA("PrimaryPart") then orb else orb.PrimaryPart
+
 		if poiPos ~= nil then
-			orbTween = TweenService:Create(orb, tweenInfo, 
+			orbTween = TweenService:Create(orbToTween, tweenInfo, 
 				{CFrame = CFrame.lookAt(minWaypoint.Position, poiPos)})
 		else
-			orbTween = TweenService:Create(orb, tweenInfo, 
+			orbTween = TweenService:Create(orbToTween, tweenInfo, 
 				{Position = minWaypoint.Position})
 		end
 
@@ -388,7 +453,7 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 		return minWaypoint.Position
 	end
 
-	return orb.Position
+	return orb:GetPivot().Position
 end
 
 function Orb.AddGhost(orb, playerId)
@@ -400,12 +465,12 @@ function Orb.AddGhost(orb, playerId)
 		character.Archivable = false
 
 		ghost.Name = tostring(playerId)
-		local distanceOrbPlayer = (orb.Position - character.PrimaryPart.Position).Magnitude
+		local distanceOrbPlayer = (orb:GetPivot().Position - character.PrimaryPart.Position).Magnitude
 		local ghostPos = ghost.PrimaryPart.Position - distanceOrbPlayer * ghost.PrimaryPart.CFrame.LookVector
 		ghostPos += Vector3.new(0,0.3,0) -- pop them up in the air a bit
 
 		-- This offset is preserved when walking ghosts
-		Orb.GhostOffsets[ghost.Name] = ghostPos - orb.Position
+		Orb.GhostOffsets[ghost.Name] = ghostPos - orb:GetPivot().Position
 
 		-- Make the ghost look towards the speaker, if there is one
 		local speakerPos = Orb.GetSpeakerPosition(orb)
