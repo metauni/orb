@@ -36,7 +36,7 @@ The values guiding the design of the orb system and the use of spatial voice in 
 
 4. **Right to know who is listening**: in physical space you can cheaply compute an estimate of who can hear you (it's called "looking around"). A system like spatial voice which tempts you to apply the same heuristics shouldn't then violate them. If someone is getting an audio feed from a location, there should be a very clear indicator that this is the case.
 
-5. **Recording should be easy**: most talks ever given are lost and that's a shame. Making it easy to produce and share high quality recordings of mathematics is a core value of metauni.
+5. **Speaking and recording should be easy**: most talks ever given are lost and that's a shame. Making it easy to produce and share high quality recordings of mathematics is a core value of metauni. That means that the orb system should be *as easy as possible* for the speakers, and not putting annoying demands on them.
 
 ## Generating a Release
 
