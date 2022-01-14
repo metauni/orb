@@ -20,6 +20,13 @@ A typical example: waypoints are located in front of metaboards, and an orb foll
 
 Download the release, drag the `metaorb.rbxmx` file into `ServerScriptService` and then tag the objects you wish to play the role of orbs with the tag `metaorb`. Optionally tag some parts (usually invisible) with the tag `metaorb_waypoint` and `metaorb_poi`.
 
+To create a transport orb tag a `BasePart` or `Model` with both `metaorb` and `metaorb_transport` and put inside it a Folder named `Stops` containing the following:
+
+* ObjectValues named `1, 2, ..., n` for some `n`, which point to
+* Models containing a Part named `Marker` and a NumberValue named `TimeToNextStop`.
+
+If you do this then the transport orb will move between the markers, taking the given amount of time between each (and loops around from the beginning once it reaches `n`).
+
 Some notes:
 
 * By default anybody can attach themselves as a speaker to any orb. If you have the metauni [Admin Commands](https://github.com/metauni/admin) installed, then only users with the scribe permission will be able to attach themselves as a speaker to an orb.

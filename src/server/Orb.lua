@@ -110,7 +110,7 @@ function Orb.Init()
 	print("[Orb] Server ".. Config.Version .." initialized")
 end
 
-function Orb.InitOrb(orb)
+function Orb.InitAVOrb(orb)
 	local listeners = orb:FindFirstChild("Listeners")
 
 	if listeners == nil then
@@ -161,7 +161,7 @@ function Orb.InitOrb(orb)
 	announceSound.Volume = 0.3
 	announceSound.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
-	-- Sound to announce speaker attachment
+	-- Sound to announce speaker detach
 	local detachSpeakerSound = Instance.new("Sound")
 	detachSpeakerSound.Name = "DetachSound"
 	detachSpeakerSound.SoundId = "rbxassetid://" .. tostring(speakerDetachSoundId)
@@ -172,6 +172,125 @@ function Orb.InitOrb(orb)
 	detachSpeakerSound.Looped = false
 	detachSpeakerSound.Volume = 0.3
 	detachSpeakerSound.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+end
+
+function Orb.InitTransportOrb(orb)
+	local attachAlign = orb:FindFirstChild("AttachmentAlign")
+	if attachAlign == nil then
+		attachAlign = Instance.new("Attachment")
+		attachAlign.Name = "AttachmentAlign"
+		attachAlign.Orientation = Vector3.new(0,0,-90)
+		attachAlign.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+		attachAlign.Position = Vector3.new(0,0,0)
+	end
+
+	local stopsFolder = orb:FindFirstChild("Stops")
+	if stopsFolder == nil then
+		stopsFolder = Instance.new("Folder")
+		stopsFolder.Name = "Stops"
+		stopsFolder.Parent = orb
+	end
+
+	local nextStop = orb:FindFirstChild("NextStop")
+	if nextStop == nil then
+		nextStop = Instance.new("IntValue")
+		nextStop.Name = "NextStop"
+		nextStop.Value = 0
+		nextStop.Parent = orb
+	end
+
+	local numStops = orb:FindFirstChild("NumStops")
+	if numStops == nil then
+		numStops = Instance.new("IntValue")
+		numStops.Name = "NumStops"
+		numStops.Value = 0
+		numStops.Parent = orb
+	end
+
+	-- Verify that the stops folder has the appropriate structure
+	-- It should contain ObjectValues named 1, 2, ... , n for some
+	-- n >= 0, each one of which has as its value a Model containing
+	-- two instances, one Part named "Marker" and one NumberValue
+	-- named "TimeToNextStop" with a positive value
+	local i = 0
+	while true do
+		local objectValue = stopsFolder:FindFirstChild(tostring(i+1))
+		if not objectValue then break end
+		if not objectValue:IsA("ObjectValue") then break end
+
+		local object = objectValue.Value
+
+		if not object then break end
+		if not object:IsA("Model") then break end
+
+		local markerPart = object:FindFirstChild("Marker")
+		local timeValue = object:FindFirstChild("TimeToNextStop")
+
+		if not markerPart then break end
+		if not markerPart:IsA("BasePart") then break end
+		if not timeValue then break end
+		if not timeValue:IsA("NumberValue") then break end
+		if timeValue.Value <= 0 then break end
+
+		-- This is a valid stop
+		markerPart.Anchored = true
+		markerPart.Transparency = 1
+		markerPart.CanCollide = false
+
+		i += 1
+	end
+
+	numStops.Value = i
+	
+	if i > 0 then
+		Orb.TransportNextStop(orb)
+	end
+end
+
+function Orb.TransportNextStop(orb)
+	local orbPart = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+	orbPart.Anchored = false
+	
+	local nextStop = orb.NextStop.Value
+	local numStops = orb.NumStops.Value
+
+	nextStop += 1
+
+	if nextStop > numStops then
+		nextStop = 1
+	end
+
+	orb.NextStop.Value = nextStop
+
+	local stopModel = orb.Stops:FindFirstChild(tostring(nextStop)).Value
+	local stopMarker = stopModel.Marker
+	local stopTime = stopModel.TimeToNextStop.Value
+	
+	local alignPos = orbPart:FindFirstChild("AlignPosition")
+	if alignPos ~= nil then
+		alignPos:Destroy()
+	end
+	
+	alignPos = Instance.new("AlignPosition")
+	alignPos.Attachment0 = orbPart.AttachmentAlign
+	alignPos.Name = "AlignPosition"
+	alignPos.Mode = Enum.PositionAlignmentMode.OneAttachment	
+	alignPos.Enabled = true
+	alignPos.RigidityEnabled = false	
+	alignPos.MaxForce = math.huge
+	alignPos.Position = stopMarker.Position
+	alignPos.MaxVelocity = (orb:GetPivot().Position - stopMarker.Position).Magnitude / stopTime
+	alignPos.Parent = orbPart
+	
+	task.delay( stopTime + Config.TransportWaitTime, Orb.TransportNextStop, orb )
+end
+
+function Orb.InitOrb(orb)
+	if CollectionService:HasTag(orb, Config.TransportTag) then
+		Orb.InitTransportOrb(orb)
+	else
+		Orb.InitAVOrb(orb)
+	end
 
 	-- Light
 	local plight = Instance.new("PointLight")
@@ -205,7 +324,7 @@ function Orb.AddLuggage(orb, playerId)
 	rope.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 	rope.Attachment0 = attach0
 	rope.Attachment1 = attach1
-	rope.Length = 13
+	rope.Length = Config.RopeLength + math.random(1,10)
 	rope.Visible = true
 end
 

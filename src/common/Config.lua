@@ -6,6 +6,8 @@ local Config = {
 	DataStoreTag = "orb.",
 	Version = "0.3.0",
 	TweenTime = 5,
+	RopeLength = 10,
+	TransportWaitTime = 10
 }
 
 Config.Defaults = {
