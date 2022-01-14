@@ -516,7 +516,14 @@ function Gui.OrbcamOn(guiOff)
 	
     local orbPos = Gui.Orb:GetPivot().Position
 
-    local orbCameraPos = Vector3.new(orbPos.X, poiPos.Y, orbPos.Z)
+    local orbCameraPos
+    
+    if CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
+        orbCameraPos = orbPos + Vector3.new(0,30,0)
+    else
+        orbCameraPos = Vector3.new(orbPos.X, poiPos.Y, orbPos.Z)
+    end
+
 	camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
     
     if guiOff then

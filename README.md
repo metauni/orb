@@ -23,7 +23,7 @@ Download the release, drag the `metaorb.rbxmx` file into `ServerScriptService` a
 To create a transport orb tag a `BasePart` or `Model` with both `metaorb` and `metaorb_transport` and put inside it a Folder named `Stops` containing the following:
 
 * ObjectValues named `1, 2, ..., n` for some `n`, which point to
-* Models containing a Part named `Marker` and a NumberValue named `TimeToNextStop`.
+* Models containing a Part named `Marker` and a NumberValue named `TimeToThisStop`.
 
 If you do this then the transport orb will move between the markers, taking the given amount of time between each (and loops around from the beginning once it reaches `n`).
 

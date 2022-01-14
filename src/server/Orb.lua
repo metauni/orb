@@ -211,7 +211,7 @@ function Orb.InitTransportOrb(orb)
 	-- It should contain ObjectValues named 1, 2, ... , n for some
 	-- n >= 0, each one of which has as its value a Model containing
 	-- two instances, one Part named "Marker" and one NumberValue
-	-- named "TimeToNextStop" with a positive value
+	-- named "TimeToThisStop" with a positive value
 	local i = 0
 	while true do
 		local objectValue = stopsFolder:FindFirstChild(tostring(i+1))
@@ -224,7 +224,7 @@ function Orb.InitTransportOrb(orb)
 		if not object:IsA("Model") then break end
 
 		local markerPart = object:FindFirstChild("Marker")
-		local timeValue = object:FindFirstChild("TimeToNextStop")
+		local timeValue = object:FindFirstChild("TimeToThisStop")
 
 		if not markerPart then break end
 		if not markerPart:IsA("BasePart") then break end
@@ -264,7 +264,7 @@ function Orb.TransportNextStop(orb)
 
 	local stopModel = orb.Stops:FindFirstChild(tostring(nextStop)).Value
 	local stopMarker = stopModel.Marker
-	local stopTime = stopModel.TimeToNextStop.Value
+	local stopTime = stopModel.TimeToThisStop.Value
 	
 	local alignPos = orbPart:FindFirstChild("AlignPosition")
 	if alignPos ~= nil then
