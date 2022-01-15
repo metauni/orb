@@ -341,6 +341,8 @@ function Gui.Detach()
         luggageGui.Enabled = false
         local luggagePrompt = if orb:IsA("BasePart") then orb.LuggagePrompt else orb.PrimaryPart.LuggagePrompt
         luggagePrompt.Enabled = true
+        Gui.OrbcamOff()
+        peekButtonLuggage.BackgroundColor3 = Color3.new(0,0,0)
     else
         -- If the orb is currently on the move, do not enable it yet
         if not orb:GetAttribute("tweening") then
