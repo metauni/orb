@@ -16,6 +16,8 @@ There is an [introductory video](https://youtu.be/0vuNKcCv1sk). In more detail
 
 A typical example: waypoints are located in front of metaboards, and an orb follows a speaker from board to board.
 
+**NOTE** that installing the Orb System will, by default, make players listen from the location of their head rather than the position of their camera (which is the default in Roblox). You can change this behaviour by setting `Config.ListenFromPlayer` to `false`.
+
 ## Installation
 
 Download the release, drag the `metaorb.rbxmx` file into `ServerScriptService` and then tag the objects you wish to play the role of orbs with the tag `metaorb`. Optionally tag some parts (usually invisible) with the tag `metaorb_waypoint` and `metaorb_poi`.
