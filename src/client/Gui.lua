@@ -25,6 +25,7 @@ local peekButton, detachSpeakerButton, speakerViewportFrame
 local returnButtonSpeaker, peekButtonSpeaker, luggageGui
 local peekButtonLuggage, detachLuggageButton
 local localPlayer
+local storedCameraOffset = nil
 
 local Gui = {}
 Gui.__index = Gui
@@ -444,13 +445,19 @@ end
 --
 
 local function resetCameraSubject()
-	local localPlayer = Players.LocalPlayer
+	local camera = workspace.CurrentCamera
+	if not camera then return end
 
-	if workspace.CurrentCamera and localPlayer.Character then
-		local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			workspace.CurrentCamera.CameraSubject = humanoid
-		end
+    local character = localPlayer.Character
+	if not character then return end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		workspace.CurrentCamera.CameraSubject = humanoid
+	end
+
+	if storedCameraOffset and character.Head then
+		camera.CFrame = CFrame.lookAt(character.Head.Position + storedCameraOffset, character.Head.Position)
 	end
 end
 
@@ -512,21 +519,34 @@ function Gui.OrbcamOn(guiOff)
 
 	local camera = workspace.CurrentCamera
 	
-	if camera.CameraType ~= Enum.CameraType.Scriptable then
-		camera.CameraType = Enum.CameraType.Scriptable
-	end
-	
     local orbPos = Gui.Orb:GetPivot().Position
-
-    local orbCameraPos
+    
+    local character = localPlayer.Character
+	if character and character.Head then
+		storedCameraOffset = camera.CFrame.Position - character.Head.Position
+	end
     
     if CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
-        orbCameraPos = orbPos + Vector3.new(0,30,0)
-    else
-        orbCameraPos = Vector3.new(orbPos.X, poiPos.Y, orbPos.Z)
-    end
+        -- A transport orb looks from the next stop back to the orb
+        -- as it approaches
+        camera.CameraType = Enum.CameraType.Watch
+        local orb = Gui.Orb
+        camera.CameraSubject = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
-	camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
+        local nextStop = orb.NextStop.Value
+        local nextStopPart = orb.Stops:FindFirstChild(tostring(nextStop)).Value.Marker
+
+        camera.CFrame = CFrame.new(nextStopPart.Position + Vector3.new(0,20,0))
+    else
+        if camera.CameraType ~= Enum.CameraType.Scriptable then
+            camera.CameraType = Enum.CameraType.Scriptable
+        end
+
+        -- If we are a normal orb we look from a height adjusted
+        -- to the point of interest
+        local orbCameraPos = Vector3.new(orbPos.X, poiPos.Y, orbPos.Z)
+        camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
+    end
     
     if guiOff then
         if CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
