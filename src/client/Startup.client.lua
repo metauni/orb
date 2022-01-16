@@ -21,4 +21,5 @@ end)
 
 Players.LocalPlayer.CharacterRemoving:Connect(function()
 	Gui.Detach()
+	Gui.RemoveEar()
 end)

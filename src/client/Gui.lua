@@ -49,7 +49,10 @@ function Gui.Init()
     Gui.Orbcam = false
     Gui.CameraTween = nil
 
-    SoundService:SetListener(Enum.ListenerType.Camera)
+    Gui.Ear = nil
+    Gui.EarConnection = nil
+
+    Gui.InitEar()
 
     listenButton = listenerGui:WaitForChild("ListenButton")
     detachButton = listenerGui:WaitForChild("DetachButton")
@@ -266,6 +269,60 @@ function Gui.Init()
 	print("[Orb] Gui Initialised")
 end
 
+-- We create a part inside the player's head, whose CFrame
+-- is tracked by SetListener
+function Gui.InitEar()
+    if not Config.ListenFromPlayer then
+        SoundService:SetListener(Enum.ListenerType.Camera)
+        return
+    end
+
+    local character = localPlayer.Character
+    local head = character:WaitForChild("Head")
+
+    local camera = workspace.CurrentCamera
+	if not camera then return end
+
+    local lookDirection = camera.CFrame.LookVector
+
+    local head = character.Head
+    local ear = character:FindFirstChild(Config.EarName)
+    if ear then
+        ear:Destroy()
+    end
+
+    ear = Instance.new("Part")
+    ear.Name = Config.EarName
+    ear.Size = Vector3.new(0.1,0.1,0.1)
+    ear.CanCollide = false
+    ear.CastShadow = false
+    ear.CFrame = CFrame.lookAt(head.Position, head.Position + lookDirection)
+    ear.Transparency = 1
+    ear.Parent = character
+
+    Gui.Ear = ear
+    SoundService:SetListener(Enum.ListenerType.ObjectCFrame, ear)
+
+    Gui.EarConnection = RunService.RenderStepped:Connect(function(delta)
+        local nowCamera = workspace.CurrentCamera
+	    if not nowCamera then return end
+
+        ear.CFrame = CFrame.lookAt(head.Position, 
+            head.Position + nowCamera.CFrame.LookVector)
+    end)
+end
+
+function Gui.RemoveEar()
+    if Gui.EarConnection then
+        Gui.EarConnection:Disconnect()
+        Gui.EarConnection = nil
+    end
+
+    if Gui.Ear then
+        Gui.Ear:Destroy()
+    end
+end
+
 -- Refresh the visibility of the normal and speaker proximity prompts
 function Gui.RefreshPrompts(orb, speakerId)
     local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
@@ -332,7 +389,12 @@ end
 function Gui.ListenOff()
     Gui.Listening = false
     listenButton.BackgroundTransparency = 0.75
-    SoundService:SetListener(Enum.ListenerType.Camera)
+
+    if Config.ListenFromPlayer and Gui.Ear ~= nil then
+        SoundService:SetListener(Enum.ListenerType.ObjectCFrame, Gui.Ear)
+    else
+        SoundService:SetListener(Enum.ListenerType.Camera)
+    end
 end
 
 -- Detach, as listener or speaker
