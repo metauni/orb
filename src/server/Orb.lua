@@ -711,21 +711,15 @@ function Orb.PointOfInterest(targetPos)
 
     for _, family in ipairs(families) do
         for _, p in ipairs(family) do
-            local pos = nil
+			if CollectionService:HasTag(p, "metaboard_personal") then continue end
 
-            if p:IsA("BasePart") then
-                pos = p.Position
-            elseif p:IsA("Model") and p.PrimaryPart ~= nil then
-                pos = p.PrimaryPart.Position
-            end
-
-            if pos ~= nil then
-                local distance = (pos - targetPos).Magnitude
-                if distance < minDistance then
-                    minDistance = distance
-                    closestPos = pos
-                end
-            end
+            local pos = p:GetPivot().Position
+            
+			local distance = (pos - targetPos).Magnitude
+			if distance < minDistance then
+				minDistance = distance
+				closestPos = pos
+			end
         end
     end
 

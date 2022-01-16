@@ -300,6 +300,8 @@ function Gui.PointOfInterest()
 
     for _, family in ipairs(families) do
         for _, p in ipairs(family) do
+			if CollectionService:HasTag(p, "metaboard_personal") then continue end
+
             local pos = p:GetPivot().Position
 
             if pos ~= nil then
