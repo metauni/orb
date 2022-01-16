@@ -456,9 +456,15 @@ local function resetCameraSubject()
 		workspace.CurrentCamera.CameraSubject = humanoid
 	end
 
-	if storedCameraOffset and character.Head then
-		camera.CFrame = CFrame.lookAt(character.Head.Position + storedCameraOffset, character.Head.Position)
-	end
+    if storedCameraOffset then
+	    if character.Head then
+		    camera.CFrame = CFrame.lookAt(character.Head.Position + storedCameraOffset, character.Head.Position)
+	    end
+
+        storedCameraOffset = nil
+    else
+        print("ERROR: storedCameraOffset not set.")
+    end
 end
 
 function Gui.OrbTweeningStart(orb, newPos, poiPos)
