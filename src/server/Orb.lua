@@ -331,6 +331,7 @@ end
 function Orb.RemoveLuggage(orb, playerId)
 	local plr = Players:GetPlayerByUserId(playerId)
 	if not plr then return end
+	if not plr.Character or not plr.Character.PrimaryPart then return end
 
 	local attachName = "Attachment0" .. tostring(playerId)
 	local attach0 = if orb:IsA("BasePart") then orb:FindFirstChild(attachName) else orb.PrimaryPart:FindFirstChild(attachName)
@@ -548,7 +549,7 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 		local poiPos = Orb.PointOfInterest(minWaypoint.Position)
 		
 		local orbTween
-		local orbToTween = if orb:IsA("PrimaryPart") then orb else orb.PrimaryPart
+		local orbToTween = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
 		if poiPos ~= nil then
 			orbTween = TweenService:Create(orbToTween, tweenInfo, 
