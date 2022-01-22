@@ -48,7 +48,7 @@ function Gui.Init()
     Gui.HasSpeakerPermission = true -- can attach as speaker?
     Gui.Orbcam = false
     Gui.CameraTween = nil
-
+    Gui.Head = nil
     Gui.Ear = nil
     Gui.EarConnection = nil
 
@@ -301,14 +301,21 @@ function Gui.InitEar()
     ear.Parent = character
 
     Gui.Ear = ear
+    Gui.Head = head
     SoundService:SetListener(Enum.ListenerType.ObjectCFrame, ear)
 
     Gui.EarConnection = RunService.RenderStepped:Connect(function(delta)
         local nowCamera = workspace.CurrentCamera
 	    if not nowCamera then return end
+        
+        -- The head may be destroyed
+        if Gui.Head == nil then
+            Gui.Head = localPlayer.Character:FindFirstChild("Head")
+            if Gui.Head == nil then return end
+        end
 
-        ear.CFrame = CFrame.lookAt(head.Position, 
-            head.Position + nowCamera.CFrame.LookVector)
+        ear.CFrame = CFrame.lookAt(Gui.Head.Position, 
+            Gui.Head.Position + nowCamera.CFrame.LookVector)
     end)
 end
 
