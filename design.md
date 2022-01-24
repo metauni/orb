@@ -2,7 +2,7 @@
 
 Some of the anecdotal observations that have guided this design:
 
-1. **Speakers value seeing the audience**: especially in a virtual format, it is important for the speaker to see (or hear) from time to time that people are there and listening. Migrating from board to board by foot (e.g. in the festival of math event) is a useful indicator of that to the speaker. Speakers do a better job when they sense investment from the audience. 
+1. **Speakers value seeing the audience**: especially in a virtual format, it is important for the speaker to see (or hear) from time to time that people are there and listening. Migrating from board to board by foot (e.g. in the festival of math event) is a useful indicator of that to the speaker. Speakers do a better job when they sense investment from the audience.
 
 2. **Sometimes you think better on your feet**: a typical metauni behaviour is to wander off and find a nice view or something to toy with (an apple to eat in TRS, a ring to sit on in Deprecation) during a talk, and then wander back. With Discord audio you don't miss the audio, although you may not be able to see the board. At least in my case I think this often serves as a virtual substitute for the well known phenomenon of "let's go for a walk and talk on the way". I've heard feedback from multiple people that they find it easier to focus on a talk in metauni than *in a live venue* because in the latter they fidget and want to get up and walk around (I think this is not universal, but it is interesting to note anyway).
 
