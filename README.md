@@ -50,6 +50,7 @@ The values guiding the design of the orb system and the use of spatial voice in 
 ## Generating a Release
 
 The `metaorb.rbxmx` file is generated like this
+
 ```bash
 rojo build --output "build.rbxlx"
 remodel run orb_packager.lua
@@ -57,6 +58,6 @@ remodel run orb_packager.lua
 
 The first command builds a place file according to `default.project.json`.
 The second command uses [remodel](https://github.com/rojo-rbx/remodel) to extract all of the components of the Orb system,
-and packages them all within the `OrbServer` folder, and exports this 
+and packages them all within the `OrbServer` folder, and exports this
 as a `metaorb.rbxmx` file. The startup server script then redistributes these
 components on world boot.
