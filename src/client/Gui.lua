@@ -456,9 +456,17 @@ function Gui.PopulateViewportSpeaker()
         CollectionService:RemoveTag(orbClone, tag)
     end
 
-    -- Get rid of waypoints and such
-    -- orbClone:ClearAllChildren()
+    -- Get rid of rings
+    local eyeRingClone = orbClone:FindFirstChild("EyeRing")
+    if eyeRingClone then
+        eyeRingClone:Destroy()
+    end
 
+    local earRingClone = orbClone:FindFirstChild("EarRing")
+    if earRingClone then
+        earRingClone:Destroy()
+    end
+    
     orbClone:PivotTo(CFrame.new(0,0,0))
     orbClone.Name = "Orb"
     orbClone.Parent = speakerViewportFrame

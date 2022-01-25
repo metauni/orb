@@ -231,12 +231,14 @@ function Orb.InitAVOrb(orb)
 	earRingTracker.Name = "EarRingTracker"
 	earRingTracker.CanCollide = false
 	earRingTracker.CastShadow = false
+	earRingTracker.Anchored = true
 	earRingTracker.Transparency = 1
 	earRingTracker.Size = Vector3.new(0.1,0.1,0.1)
 	earRingTracker.Parent = orb
 
 	local earRing = earRingOuter:SubtractAsync({earRingInner})
 	earRing.Name = "EarRing"
+	earRing.Anchored = true
 	earRing.Parent = orb
 	earRing.CastShadow = false
 	earRing.CanCollide = false
