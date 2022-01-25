@@ -155,7 +155,7 @@ function Gui.Init()
                 -- If we are not currently attached as either or speaker
                 -- or listener, make the speaker prompt enabled
                 if speakerPrompt and not Gui.Orb == orb then
-                    speakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == 0
+                    speakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == nil
                 end
             end
 		end)
@@ -225,7 +225,7 @@ function Gui.Init()
             ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
                 if prompt == speakerPrompt and prompt.Name == "SpeakerPrompt" then
                     -- Only allow someone to attach if there is no current speaker
-                    if orb.Speaker.Value == 0 then
+                    if orb.Speaker.Value == nil then
                         OrbAttachSpeakerRemoteEvent:FireServer(orb)
                         Gui.AttachSpeaker(orb)
                     end
@@ -331,13 +331,13 @@ function Gui.RemoveEar()
 end
 
 -- Refresh the visibility of the normal and speaker proximity prompts
-function Gui.RefreshPrompts(orb, speakerId)
+function Gui.RefreshPrompts(orb, speaker)
     local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
 
     -- If we are not currently attached as either or speaker
     -- or listener, make the speaker prompt enabled
     if speakerPrompt ~= nil and Gui.Orb ~= orb then
-        speakerPrompt.Enabled = Gui.HasSpeakerPermission and speakerId == 0 and not orb:GetAttribute("tweening")
+        speakerPrompt.Enabled = Gui.HasSpeakerPermission and speaker == nil and not orb:GetAttribute("tweening")
     end
 end
 
@@ -389,7 +389,9 @@ function Gui.ListenOn()
     if Gui.Orb then
         -- Enum.ListenerType.ObjectPosition (if player rotates camera, it changes angle of sound sources)
         -- Enum.LIstenerType.ObjectCFrame (sound from the position and angle of object)
-        SoundService:SetListener(Enum.ListenerType.ObjectCFrame, Gui.Orb)
+        -- Note that the orb's EarRingTracker points at the current speaker (if there is one)
+        -- and at the current point of interest otherwise
+        SoundService:SetListener(Enum.ListenerType.ObjectCFrame, Gui.Orb.EarRingTracker)
     end
 end
 
@@ -559,7 +561,7 @@ function Gui.OrbTweeningStop(orb)
         local normalPrompt = if orb:IsA("BasePart") then orb.NormalPrompt else orb.PrimaryPart.NormalPrompt
         local speakerPrompt = if orb:IsA("BasePart") then orb.SpeakerPrompt else orb.PrimaryPart.SpeakerPrompt
         normalPrompt.Enabled = true
-        speakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == 0
+        speakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == nil
     end
 
     orb:SetAttribute("tweening", false)

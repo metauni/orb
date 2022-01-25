@@ -1,6 +1,7 @@
 local CollectionService = game:GetService("CollectionService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local Common = game:GetService("ReplicatedStorage").OrbCommon
 local Config = require(Common.Config)
@@ -44,7 +45,7 @@ function Orb.Init()
 	end)
 
 	OrbAttachSpeakerRemoteEvent.OnServerEvent:Connect(function(plr, orb)
-		Orb.SetSpeaker(orb, plr.UserId)
+		Orb.SetSpeaker(orb, plr)
 		
 		local plight = if orb:IsA("BasePart") then orb:FindFirstChild("PointLight") else orb.PrimaryPart:FindFirstChild("PointLight")
 		if plight then plight.Enabled = true end
@@ -122,9 +123,9 @@ function Orb.InitAVOrb(orb)
 	local speaker = orb:FindFirstChild("Speaker")
 
 	if speaker == nil then
-		speaker = Instance.new("IntValue")
+		speaker = Instance.new("ObjectValue")
 		speaker.Name = "Speaker"
-		speaker.Value = 0
+		speaker.Value = nil
 		speaker.Parent = orb
 	end
 
@@ -172,6 +173,98 @@ function Orb.InitAVOrb(orb)
 	detachSpeakerSound.Looped = false
 	detachSpeakerSound.Volume = 0.3
 	detachSpeakerSound.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+
+	-- Create the rings which indicate the look and hear directions of this orb
+	local orbSize = if orb:IsA("BasePart") then orb.Size else orb.PrimaryPart.Size
+
+	-- Make the ring by subtracting two cylinders
+	local eyeRingOuter = Instance.new("Part")
+	eyeRingOuter.Name = "EyeRingOuter"
+	eyeRingOuter.Size = Vector3.new(0.10,orbSize.Y + 1,orbSize.Y + 1)
+	eyeRingOuter.CFrame = orb:GetPivot()
+	eyeRingOuter.Parent = game.workspace
+	eyeRingOuter.Shape = "Cylinder"
+	eyeRingOuter.Anchored = true
+	eyeRingOuter.Material = Enum.Material.Neon
+	eyeRingOuter.Color = Color3.new(0,0,0)
+
+	local eyeRingInner = Instance.new("Part")
+	eyeRingInner.Name = "EyeRingInner"
+	eyeRingInner.Size = Vector3.new(0.15,orbSize.Y + 0.5,orbSize.Y + 0.5)
+	eyeRingInner.CFrame = orb:GetPivot()
+	eyeRingInner.Parent = game.workspace
+	eyeRingInner.Shape = "Cylinder"
+	eyeRingInner.Anchored = true
+	eyeRingInner.Material = Enum.Material.Neon
+	eyeRingInner.Color = Color3.new(0,0,0)
+
+	local eyeRing = eyeRingOuter:SubtractAsync({eyeRingInner})
+	eyeRing.Name = "EyeRing"
+	eyeRing.Parent = orb
+	eyeRing.CastShadow = false
+	eyeRing.CanCollide = false
+
+	eyeRingOuter:Destroy()
+	eyeRingInner:Destroy()
+
+	local earRingOuter = Instance.new("Part")
+	earRingOuter.Name = "EarRingOuter"
+	earRingOuter.Size = Vector3.new(0.10,orbSize.Y + 0.5,orbSize.Y + 0.5)
+	earRingOuter.CFrame = orb:GetPivot()
+	earRingOuter.Parent = game.workspace
+	earRingOuter.Shape = "Cylinder"
+	earRingOuter.Anchored = true
+	earRingOuter.Material = Enum.Material.Neon
+	earRingOuter.Color = Color3.new(1,1,1)
+
+	local earRingInner = Instance.new("Part")
+	earRingInner.Name = "EarRingInner"
+	earRingInner.Size = Vector3.new(0.15,orbSize.Y + 0.1,orbSize.Y + 0.1)
+	earRingInner.CFrame = orb:GetPivot()
+	earRingInner.Parent = game.workspace
+	earRingInner.Shape = "Cylinder"
+	earRingInner.Anchored = true
+	earRingInner.Material = Enum.Material.Neon
+	earRingInner.Color = Color3.new(1,1,1)
+
+	local earRingTracker = Instance.new("Part")
+	earRingTracker.Name = "EarRingTracker"
+	earRingTracker.CanCollide = false
+	earRingTracker.CastShadow = false
+	earRingTracker.Transparency = 1
+	earRingTracker.Size = Vector3.new(0.1,0.1,0.1)
+	earRingTracker.Parent = orb
+
+	local earRing = earRingOuter:SubtractAsync({earRingInner})
+	earRing.Name = "EarRing"
+	earRing.Parent = orb
+	earRing.CastShadow = false
+	earRing.CanCollide = false
+	earRing.Transparency = 0.8
+
+	earRingOuter:Destroy()
+	earRingInner:Destroy()
+
+	-- Keep the ring orientation fixed to the orb's orientation
+	RunService.Heartbeat:Connect(function(delta)
+		local orbCFrame = if orb:IsA("BasePart") then orb.CFrame else orb.PrimaryPart.CFrame
+
+		-- The eye ring looks where the orb looks, which is generally
+		-- towards the nearest point of interest
+		eyeRing.CFrame = orbCFrame * CFrame.Angles(0, math.pi/2, 0)
+
+		-- The ear ring looks towards the speaker if there is one, and
+		-- otherwise in the same direction as the eye ring
+		local orbSpeaker = orb.Speaker.Value
+
+		if orbSpeaker and orbSpeaker.Character then
+			earRingTracker.CFrame = CFrame.lookAt(orbCFrame.Position, orbSpeaker.Character:GetPivot().Position)
+			earRing.CFrame = earRingTracker.CFrame * CFrame.Angles(0, math.pi/2, 0)
+		else
+			earRingTracker.CFrame = eyeRing.CFrame
+			earRing.CFrame = eyeRing.CFrame
+		end
+	end)
 end
 
 function Orb.InitTransportOrb(orb)
@@ -368,7 +461,9 @@ function Orb.Detach(orb, playerId)
 
 		-- If this user was the speaker, detaching means
 		-- they detached from being the speaker
-		if orb.Speaker.Value == playerId then
+		local orbSpeaker = orb.Speaker.Value
+
+		if orbSpeaker and orbSpeaker.UserId == playerId then
 			Orb.SetSpeaker(orb, nil)
 			Orb.PlayDetachSpeakerSound(orb)
 
@@ -376,7 +471,7 @@ function Orb.Detach(orb, playerId)
 			if plight then plight.Enabled = false end
 
 			-- Notify clients that the speaker detached
-			OrbDetachSpeakerRemoteEvent:FireAllClients(orb, 0)
+			OrbDetachSpeakerRemoteEvent:FireAllClients(orb, nil)
 		end
 	end
 end
@@ -676,21 +771,20 @@ function Orb.RemoveListener(orb, listenerID)
 end
 
 function Orb.SetSpeaker(orb, speaker)
-	if speaker ~= nil then
-		orb.Speaker.Value = speaker
+	orb.Speaker.Value = speaker
+
+	if speaker == nil then
+		orb.EarRing.Transparency = 0.8
 	else
-		-- Set speaker to nil to disconnect a speaker
-		orb.Speaker.Value = 0
+		orb.EarRing.Transparency = 0
 	end
 end
 
 function Orb.GetSpeakerPosition(orb)
-	if orb.Speaker.Value == 0 then return nil end
+	local orbSpeaker = orb.Speaker.Value
+	if orbSpeaker == nil then return nil end
 
-	local plr = Players:GetPlayerByUserId(orb.Speaker.Value)
-	if not plr then return nil end
-
-	return plr.Character.PrimaryPart.Position
+	return orbSpeaker.Character:GetPivot().Position
 end
 
 -- A point of interest is any object tagged with either
