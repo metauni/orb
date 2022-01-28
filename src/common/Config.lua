@@ -4,12 +4,16 @@ local Config = {
 	WaypointTag = "metaorb_waypoint",
 	PointOfInterestTag = "metaorb_poi",
 	DataStoreTag = "orb.",
-	Version = "0.4.0",
+	Version = "0.4.2",
 	TweenTime = 5,
 	RopeLength = 10,
 	TransportWaitTime = 10,
 	ListenFromPlayer = true, -- listen from the player or camera?
-	EarName = "OrbEar"
+	EarName = "OrbEar",
+	WhiteHaloName = "WhiteHalo",
+	BlackHaloName = "BlackHalo",
+	HaloOffset = 3,
+	HaloSize = 2
 }
 
 Config.Defaults = {

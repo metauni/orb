@@ -6,8 +6,11 @@ local localPlayer = Players.LocalPlayer
 local localCharacter = localPlayer.Character
 
 local Gui = require(script.Parent.Gui)
+local Halos = require(script.Parent.Halos)
 local Common = game:GetService("ReplicatedStorage").OrbCommon
 local Config = require(Common.Config)
+
+Halos.Init()
 
 if localCharacter then
 	-- When joining the game

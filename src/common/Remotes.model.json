@@ -32,6 +32,22 @@
 		{
 			"Name": "OrbTweeningStop",
 			"ClassName": "RemoteEvent"
+		},
+		{
+			"Name": "OrbListenOn",
+			"ClassName": "RemoteEvent"
+		},
+		{
+			"Name": "OrbListenOff",
+			"ClassName": "RemoteEvent"
+		},
+		{
+			"Name": "OrbcamOn",
+			"ClassName": "RemoteEvent"
+		},
+		{
+			"Name": "OrbcamOff",
+			"ClassName": "RemoteEvent"
 		}
 	]
 }

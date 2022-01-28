@@ -19,6 +19,10 @@ local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
 local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
 local OrbTweeningStartRemoteEvent = Common.Remotes.OrbTweeningStart
 local OrbTweeningStopRemoteEvent = Common.Remotes.OrbTweeningStop
+local OrbListenOnRemoteEvent = Common.Remotes.OrbListenOn
+local OrbListenOffRemoteEvent = Common.Remotes.OrbListenOff
+local OrbcamOnRemoteEvent = Common.Remotes.OrbcamOn
+local OrbcamOffRemoteEvent = Common.Remotes.OrbcamOff
 
 local listenerGui, speakerGui, listenButton, detachButton, returnButton
 local peekButton, detachSpeakerButton, speakerViewportFrame
@@ -51,6 +55,7 @@ function Gui.Init()
     Gui.Head = nil
     Gui.Ear = nil
     Gui.EarConnection = nil
+    Gui.CharacterChildAddedConnection = nil
 
     Gui.InitEar()
 
@@ -285,7 +290,6 @@ function Gui.InitEar()
 
     local lookDirection = camera.CFrame.LookVector
 
-    local head = character.Head
     local ear = character:FindFirstChild(Config.EarName)
     if ear then
         ear:Destroy()
@@ -303,6 +307,13 @@ function Gui.InitEar()
     Gui.Ear = ear
     Gui.Head = head
     SoundService:SetListener(Enum.ListenerType.ObjectCFrame, ear)
+
+    -- When the avatar editor is used, a new head may be parented to the character
+    -- NOTE: that the old head may _not_ be destroyed, so you can't just check for nil
+    Gui.CharacterChildAddedConnection = localPlayer.Character.ChildAdded:Connect(function(child)
+        if child.Name ~= "Head" then return end
+        Gui.Head = child
+    end)
 
     Gui.EarConnection = RunService.RenderStepped:Connect(function(delta)
         local nowCamera = workspace.CurrentCamera
@@ -323,6 +334,11 @@ function Gui.RemoveEar()
     if Gui.EarConnection then
         Gui.EarConnection:Disconnect()
         Gui.EarConnection = nil
+    end
+
+    if Gui.CharacterChildAddedConnection then
+        Gui.CharacterChildAddedConnection:Disconnect()
+        Gui.CharacterChildAddedConnection = nil
     end
 
     if Gui.Ear then
@@ -393,6 +409,8 @@ function Gui.ListenOn()
         -- and at the current point of interest otherwise
         SoundService:SetListener(Enum.ListenerType.ObjectCFrame, Gui.Orb.EarRingTracker)
     end
+
+    OrbListenOnRemoteEvent:FireServer()
 end
 
 function Gui.ListenOff()
@@ -404,6 +422,8 @@ function Gui.ListenOff()
     else
         SoundService:SetListener(Enum.ListenerType.Camera)
     end
+
+    OrbListenOffRemoteEvent:FireServer()
 end
 
 -- Detach, as listener or speaker
@@ -599,6 +619,8 @@ function Gui.OrbcamTweeningStart(newPos, poiPos)
 end
 
 function Gui.OrbcamOn(guiOff)
+    OrbcamOnRemoteEvent:FireServer()
+
     if Gui.Orb == nil then return end
 
     local poi, poiPos = Gui.PointOfInterest()
@@ -650,6 +672,8 @@ function Gui.OrbcamOn(guiOff)
 end
 
 function Gui.OrbcamOff(guiOff)
+    OrbcamOffRemoteEvent:FireServer()
+
 	if Gui.CameraTween then Gui.CameraTween:Cancel() end
 
     if guiOff then

@@ -14,6 +14,10 @@ local OrbSpeakerMovedRemoteEvent = Common.Remotes.OrbSpeakerMoved
 local OrbTeleportRemoteEvent = Common.Remotes.OrbTeleport
 local OrbTweeningStartRemoteEvent = Common.Remotes.OrbTweeningStart
 local OrbTweeningStopRemoteEvent = Common.Remotes.OrbTweeningStop
+local OrbListenOnRemoteEvent = Common.Remotes.OrbListenOn
+local OrbListenOffRemoteEvent = Common.Remotes.OrbListenOff
+local OrbcamOnRemoteEvent = Common.Remotes.OrbcamOn
+local OrbcamOffRemoteEvent = Common.Remotes.OrbcamOff
 
 local speakerAttachSoundIds = { 7873470625, 7873470425,
 7873469842, 7873470126, 7864771146, 7864770493, 8214755036, 8214754703}
@@ -38,10 +42,12 @@ function Orb.Init()
 
 	OrbDetachRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		Orb.Detach(orb, plr.UserId)
+		OrbDetachRemoteEvent:FireAllClients(plr, orb)
 	end)
 
 	OrbAttachRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		Orb.Attach(orb, plr.UserId)
+		OrbAttachRemoteEvent:FireAllClients(plr, orb)
 	end)
 
 	OrbAttachSpeakerRemoteEvent.OnServerEvent:Connect(function(plr, orb)
@@ -84,7 +90,6 @@ function Orb.Init()
 		if ghost ~= nil then
 			-- This is a user attached as listener
 			targetCFrame = ghost.PrimaryPart.CFrame + Vector3.new(0, 10, 0)
-			-- Orb.RemoveGhost(orb, plr.UserId)
 		else
 			-- This is a speaker
 			local orbSize = if orb:IsA("BasePart") then orb.Size else orb.PrimaryPart.Size
@@ -92,6 +97,22 @@ function Orb.Init()
 		end
 
 		plr.Character:PivotTo(targetCFrame)
+	end)
+
+	OrbListenOnRemoteEvent.OnServerEvent:Connect(function(plr)
+		OrbListenOnRemoteEvent:FireAllClients(plr)
+	end)
+
+	OrbListenOffRemoteEvent.OnServerEvent:Connect(function(plr)
+		OrbListenOffRemoteEvent:FireAllClients(plr)
+	end)
+
+	OrbcamOnRemoteEvent.OnServerEvent:Connect(function(plr)
+		OrbcamOnRemoteEvent:FireAllClients(plr)
+	end)
+
+	OrbcamOffRemoteEvent.OnServerEvent:Connect(function(plr)
+		OrbcamOffRemoteEvent:FireAllClients(plr)
 	end)
 
 	-- Remove leaving players as listeners and speakers
@@ -109,6 +130,35 @@ function Orb.Init()
 	end
 
 	print("[Orb] Server ".. Config.Version .." initialized")
+end
+
+local function makeRing(size, innerWidth, outerWidth, color)
+	-- Make the ring by subtracting two cylinders
+	local ringOuter = Instance.new("Part")
+	ringOuter.Size = Vector3.new(0.10,size + outerWidth,size + outerWidth)
+	ringOuter.CFrame = CFrame.new(0,0,0)
+	ringOuter.Shape = "Cylinder"
+	ringOuter.Anchored = true
+	ringOuter.Material = Enum.Material.Neon
+	ringOuter.Color = color
+
+	local ringInner = Instance.new("Part")
+	ringInner.Size = Vector3.new(0.15,size + innerWidth,size + innerWidth)
+	ringInner.CFrame = CFrame.new(0,0,0)
+	ringInner.Shape = "Cylinder"
+	ringInner.Anchored = true
+	ringInner.Material = Enum.Material.Neon
+	ringInner.Color = color
+
+	ringOuter.Parent = game.workspace
+	ringInner.Parent = game.workspace
+
+	local ring = ringOuter:SubtractAsync({ringInner})
+
+	ringOuter:Destroy()
+	ringInner:Destroy()
+
+	return ring
 end
 
 function Orb.InitAVOrb(orb)
@@ -177,55 +227,22 @@ function Orb.InitAVOrb(orb)
 	-- Create the rings which indicate the look and hear directions of this orb
 	local orbSize = if orb:IsA("BasePart") then orb.Size else orb.PrimaryPart.Size
 
-	-- Make the ring by subtracting two cylinders
-	local eyeRingOuter = Instance.new("Part")
-	eyeRingOuter.Name = "EyeRingOuter"
-	eyeRingOuter.Size = Vector3.new(0.10,orbSize.Y + 1,orbSize.Y + 1)
-	eyeRingOuter.CFrame = orb:GetPivot()
-	eyeRingOuter.Parent = game.workspace
-	eyeRingOuter.Shape = "Cylinder"
-	eyeRingOuter.Anchored = true
-	eyeRingOuter.Material = Enum.Material.Neon
-	eyeRingOuter.Color = Color3.new(0,0,0)
-
-	local eyeRingInner = Instance.new("Part")
-	eyeRingInner.Name = "EyeRingInner"
-	eyeRingInner.Size = Vector3.new(0.15,orbSize.Y + 0.5,orbSize.Y + 0.5)
-	eyeRingInner.CFrame = orb:GetPivot()
-	eyeRingInner.Parent = game.workspace
-	eyeRingInner.Shape = "Cylinder"
-	eyeRingInner.Anchored = true
-	eyeRingInner.Material = Enum.Material.Neon
-	eyeRingInner.Color = Color3.new(0,0,0)
-
-	local eyeRing = eyeRingOuter:SubtractAsync({eyeRingInner})
+	local eyeRing = makeRing(orbSize.Y, 0.5, 1, Color3.new(0,0,0))
 	eyeRing.Name = "EyeRing"
+	eyeRing.Anchored = true
+	eyeRing.CFrame = orb:GetPivot()
 	eyeRing.Parent = orb
 	eyeRing.CastShadow = false
 	eyeRing.CanCollide = false
 
-	eyeRingOuter:Destroy()
-	eyeRingInner:Destroy()
-
-	local earRingOuter = Instance.new("Part")
-	earRingOuter.Name = "EarRingOuter"
-	earRingOuter.Size = Vector3.new(0.10,orbSize.Y + 0.5,orbSize.Y + 0.5)
-	earRingOuter.CFrame = orb:GetPivot()
-	earRingOuter.Parent = game.workspace
-	earRingOuter.Shape = "Cylinder"
-	earRingOuter.Anchored = true
-	earRingOuter.Material = Enum.Material.Neon
-	earRingOuter.Color = Color3.new(1,1,1)
-
-	local earRingInner = Instance.new("Part")
-	earRingInner.Name = "EarRingInner"
-	earRingInner.Size = Vector3.new(0.15,orbSize.Y + 0.1,orbSize.Y + 0.1)
-	earRingInner.CFrame = orb:GetPivot()
-	earRingInner.Parent = game.workspace
-	earRingInner.Shape = "Cylinder"
-	earRingInner.Anchored = true
-	earRingInner.Material = Enum.Material.Neon
-	earRingInner.Color = Color3.new(1,1,1)
+	local earRing = makeRing(orbSize.Y, 0.1, 0.5, Color3.new(1,1,1))
+	earRing.Name = "EarRing"
+	earRing.Anchored = true
+	earRing.CFrame = orb:GetPivot()
+	earRing.Parent = orb
+	earRing.CastShadow = false
+	earRing.CanCollide = false
+	earRing.Transparency = 0.8
 
 	local earRingTracker = Instance.new("Part")
 	earRingTracker.Name = "EarRingTracker"
@@ -235,17 +252,6 @@ function Orb.InitAVOrb(orb)
 	earRingTracker.Transparency = 1
 	earRingTracker.Size = Vector3.new(0.1,0.1,0.1)
 	earRingTracker.Parent = orb
-
-	local earRing = earRingOuter:SubtractAsync({earRingInner})
-	earRing.Name = "EarRing"
-	earRing.Anchored = true
-	earRing.Parent = orb
-	earRing.CastShadow = false
-	earRing.CanCollide = false
-	earRing.Transparency = 0.8
-
-	earRingOuter:Destroy()
-	earRingInner:Destroy()
 
 	-- Keep the ring orientation fixed to the orb's orientation
 	RunService.Heartbeat:Connect(function(delta)
@@ -673,40 +679,37 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 	return orb:GetPivot().Position
 end
 
-function Orb.AddGhost(orb, playerId)
-	local plr = Players:GetPlayerByUserId(playerId)
-	if plr then
-		local character = plr.Character
-		character.Archivable = true
-		local ghost = plr.Character:Clone()
-		character.Archivable = false
+function Orb.AddGhost(orb, plr)
+	local character = plr.Character
+	character.Archivable = true
+	local ghost = plr.Character:Clone()
+	character.Archivable = false
 
-		ghost.Name = tostring(playerId)
-		local distanceOrbPlayer = (orb:GetPivot().Position - character.PrimaryPart.Position).Magnitude
-		local ghostPos = ghost.PrimaryPart.Position - distanceOrbPlayer * ghost.PrimaryPart.CFrame.LookVector
-		ghostPos += Vector3.new(0,0.3,0) -- pop them up in the air a bit
+	ghost.Name = tostring(plr.UserId)
+	local distanceOrbPlayer = (orb:GetPivot().Position - character.PrimaryPart.Position).Magnitude
+	local ghostPos = ghost.PrimaryPart.Position - distanceOrbPlayer * ghost.PrimaryPart.CFrame.LookVector
+	ghostPos += Vector3.new(0,0.3,0) -- pop them up in the air a bit
 
-		-- This offset is preserved when walking ghosts
-		Orb.GhostOffsets[ghost.Name] = ghostPos - orb:GetPivot().Position
+	-- This offset is preserved when walking ghosts
+	Orb.GhostOffsets[ghost.Name] = ghostPos - orb:GetPivot().Position
 
-		-- Make the ghost look towards the speaker, if there is one
-		local speakerPos = Orb.GetSpeakerPosition(orb)
-		if speakerPos then
-			local speakerPosXZ = Vector3.new(speakerPos.X,ghostPos.Y,speakerPos.Z)
-			ghost:PivotTo(CFrame.lookAt(ghostPos, speakerPosXZ))
-		else
-			ghost:PivotTo(CFrame.lookAt(ghostPos, character.PrimaryPart.Position))
-		end
-
-		for _, desc in ipairs(ghost:GetDescendants()) do
-			if desc:IsA("BasePart") then
-				desc.Transparency = 1 - (0.2 * (1 - desc.Transparency))
-				desc.CastShadow = false
-			end
-		end
-
-		ghost.Parent = orb.Ghosts
+	-- Make the ghost look towards the speaker, if there is one
+	local speakerPos = Orb.GetSpeakerPosition(orb)
+	if speakerPos then
+		local speakerPosXZ = Vector3.new(speakerPos.X,ghostPos.Y,speakerPos.Z)
+		ghost:PivotTo(CFrame.lookAt(ghostPos, speakerPosXZ))
+	else
+		ghost:PivotTo(CFrame.lookAt(ghostPos, character.PrimaryPart.Position))
 	end
+
+	for _, desc in ipairs(ghost:GetDescendants()) do
+		if desc:IsA("BasePart") then
+			desc.Transparency = 1 - (0.2 * (1 - desc.Transparency))
+			desc.CastShadow = false
+		end
+	end
+
+	ghost.Parent = orb.Ghosts
 end
 
 function Orb.GetGhost(orb, playerId)
@@ -739,7 +742,10 @@ function Orb.AddListener(orb, listenerID)
 	newListenerValue.Value = listenerID
 	newListenerValue.Parent = orb.Listeners
 
-	Orb.AddGhost(orb, listenerID)
+	local plr = Players:GetPlayerByUserId(listenerID)
+	if plr then
+		Orb.AddGhost(orb, plr)
+	end
 end
 
 function Orb.RemoveGhost(orb, playerId)
