@@ -48,6 +48,18 @@
 		{
 			"Name": "OrbcamOff",
 			"ClassName": "RemoteEvent"
+		},
+		{
+			"Name": "GetListeningStatus",
+			"ClassName": "RemoteFunction"
+		},
+		{
+			"Name": "GetOrbcamStatus",
+			"ClassName": "RemoteFunction"
+		},
+		{
+			"Name": "GetAttachments",
+			"ClassName": "RemoteFunction"
 		}
 	]
 }

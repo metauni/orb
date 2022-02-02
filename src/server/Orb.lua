@@ -18,6 +18,9 @@ local OrbListenOnRemoteEvent = Common.Remotes.OrbListenOn
 local OrbListenOffRemoteEvent = Common.Remotes.OrbListenOff
 local OrbcamOnRemoteEvent = Common.Remotes.OrbcamOn
 local OrbcamOffRemoteEvent = Common.Remotes.OrbcamOff
+local GetOrbcamStatusRemoteFunction = Common.Remotes.GetOrbcamStatus
+local GetListeningStatusRemoteFunction = Common.Remotes.GetListeningStatus
+local GetAttachmentsRemoteFunction = Common.Remotes.GetAttachments
 
 local speakerAttachSoundIds = { 7873470625, 7873470425,
 7873469842, 7873470126, 7864771146, 7864770493, 8214755036, 8214754703}
@@ -27,9 +30,13 @@ local speakerDetachSoundId = 7864770869
 local Orb = {}
 
 function Orb.Init()
-	-- Offset of ghosts from orbs (playedID -> Vector3)
+	-- Offset of ghosts from orbs (playerID -> Vector3)
 	Orb.GhostOffsets = {}
 	Orb.GhostTargets = {}
+
+	Orb.Attachments = {} -- (tostring(playerID) -> orb)
+	Orb.ListeningStatus = {} -- Which players are listening to an orb? For halos (tostring(playerID) -> bool)
+	Orb.OrbCamStatus = {} -- Which players are watching through orbcam? (tostring(playerID) -> bool)
 
 	local orbs = CollectionService:GetTagged(Config.ObjectTag)
 	for _, orb in ipairs(orbs) do
@@ -51,6 +58,7 @@ function Orb.Init()
 	end)
 
 	OrbAttachSpeakerRemoteEvent.OnServerEvent:Connect(function(plr, orb)
+		Orb.Attachments[tostring(plr.UserId)] = orb
 		Orb.SetSpeaker(orb, plr)
 		
 		local plight = if orb:IsA("BasePart") then orb:FindFirstChild("PointLight") else orb.PrimaryPart:FindFirstChild("PointLight")
@@ -61,7 +69,7 @@ function Orb.Init()
 		-- This event is fired from the client who is attaching as a 
 		-- speaker, but we now fire on all clients to tell them to
 		-- e.g. change their proximity prompts
-		OrbAttachSpeakerRemoteEvent:FireAllClients(orb, orb.Speaker.Value)
+		OrbAttachSpeakerRemoteEvent:FireAllClients(orb.Speaker.Value, orb)
 	end)
 
 	OrbSpeakerMovedRemoteEvent.OnServerEvent:Connect(function(plr, orb)
@@ -100,18 +108,22 @@ function Orb.Init()
 	end)
 
 	OrbListenOnRemoteEvent.OnServerEvent:Connect(function(plr)
+		Orb.ListeningStatus[tostring(plr.UserId)] = true
 		OrbListenOnRemoteEvent:FireAllClients(plr)
 	end)
 
 	OrbListenOffRemoteEvent.OnServerEvent:Connect(function(plr)
+		Orb.ListeningStatus[tostring(plr.UserId)] = false
 		OrbListenOffRemoteEvent:FireAllClients(plr)
 	end)
 
 	OrbcamOnRemoteEvent.OnServerEvent:Connect(function(plr)
+		Orb.OrbCamStatus[tostring(plr.UserId)] = true
 		OrbcamOnRemoteEvent:FireAllClients(plr)
 	end)
 
 	OrbcamOffRemoteEvent.OnServerEvent:Connect(function(plr)
+		Orb.OrbCamStatus[tostring(plr.UserId)] = false
 		OrbcamOffRemoteEvent:FireAllClients(plr)
 	end)
 
@@ -161,15 +173,19 @@ local function makeRing(size, innerWidth, outerWidth, color)
 	return ring
 end
 
+GetOrbcamStatusRemoteFunction.OnServerInvoke = function()
+	return Orb.OrbCamStatus
+end
+
+GetListeningStatusRemoteFunction.OnServerInvoke = function()
+	return Orb.ListeningStatus
+end
+
+GetAttachmentsRemoteFunction.OnServerInvoke = function()
+	return Orb.Attachments
+end
+
 function Orb.InitAVOrb(orb)
-	local listeners = orb:FindFirstChild("Listeners")
-
-	if listeners == nil then
-		listeners = Instance.new("Folder")
-		listeners.Name = "Listeners"
-		listeners.Parent = orb
-	end
-
 	local speaker = orb:FindFirstChild("Speaker")
 
 	if speaker == nil then
@@ -454,18 +470,22 @@ function Orb.RemoveLuggage(orb, playerId)
 end
 
 function Orb.Attach(orb, playerId)
+	Orb.Attachments[tostring(playerId)] = orb
+
 	if CollectionService:HasTag(orb, Config.TransportTag) then
 		Orb.AddLuggage(orb, playerId)
 	else
-		Orb.AddListener(orb, playerId)
+		Orb.AddPlayer(orb, playerId)
 	end
 end
 
 function Orb.Detach(orb, playerId)
+	Orb.Attachments[tostring(playerId)] = nil
+
 	if CollectionService:HasTag(orb, Config.TransportTag) then
 		Orb.RemoveLuggage(orb, playerId)
 	else
-		Orb.RemoveListener(orb, playerId)
+		Orb.RemovePlayer(orb, playerId)
 
 		-- If this user was the speaker, detaching means
 		-- they detached from being the speaker
@@ -479,7 +499,7 @@ function Orb.Detach(orb, playerId)
 			if plight then plight.Enabled = false end
 
 			-- Notify clients that the speaker detached
-			OrbDetachSpeakerRemoteEvent:FireAllClients(orb, nil)
+			OrbDetachSpeakerRemoteEvent:FireAllClients(nil, orb)
 		end
 	end
 end
@@ -727,20 +747,11 @@ function Orb.GetGhost(orb, playerId)
 	return nil
 end
 
-function Orb.AddListener(orb, listenerID)
+function Orb.AddPlayer(orb, listenerID)
 	if orb == nil then
 		print("[Orb] ERROR - Attempted to add listener to nil")
 		return
 	end
-
-	for _, listenerValue in ipairs(orb.Listeners:GetChildren()) do
-		if listenerValue.Value == listenerID then return end
-	end
-
-	local newListenerValue = Instance.new("IntValue")
-	newListenerValue.Name = "ListenerValue"
-	newListenerValue.Value = listenerID
-	newListenerValue.Parent = orb.Listeners
 
 	local plr = Players:GetPlayerByUserId(listenerID)
 	if plr then
@@ -762,17 +773,10 @@ function Orb.RemoveGhost(orb, playerId)
 	end
 end
 
-function Orb.RemoveListener(orb, listenerID)
+function Orb.RemovePlayer(orb, listenerID)
 	if orb == nil then
 		print("[Orb] ERROR - Attempted to remove listener from nil")
 		return
-	end
-
-	for _, listenerValue in ipairs(orb.Listeners:GetChildren()) do
-		if listenerValue.Value == listenerID then
-			listenerValue:Destroy()
-			break
-		end
 	end
 
 	Orb.RemoveGhost(orb, listenerID)

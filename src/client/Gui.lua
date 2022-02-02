@@ -347,7 +347,7 @@ function Gui.RemoveEar()
 end
 
 -- Refresh the visibility of the normal and speaker proximity prompts
-function Gui.RefreshPrompts(orb, speaker)
+function Gui.RefreshPrompts(speaker, orb)
     local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
 
     -- If we are not currently attached as either or speaker
