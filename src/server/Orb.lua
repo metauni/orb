@@ -730,7 +730,7 @@ function Orb.CheckGhosts()
 
 		if (orb:GetPivot().Position - playerPos).Magnitude > Config.GhostSpawnRadius then
 			-- Spawn a ghost if none exists
-			if not ghostExists then
+			if not ghostExists and orb.Speaker.Value ~= plr then
 				Orb.AddGhost(orb, plr)
 			end
 		else
@@ -752,10 +752,10 @@ function Orb.AddGhost(orb, plr)
 	ghost.Name = tostring(plr.UserId)
 	local distanceOrbPlayer = (orbPos - character.PrimaryPart.Position).Magnitude
 	local ghostNowPos = ghost.PrimaryPart.Position:Lerp(orbPos, 0.1)
-	ghostNowPos += Vector3.new(0,2,0) -- pop them up in the air a bit
+	ghostNowPos += Vector3.new(0,4,0) -- pop them up in the air a bit
 
 	-- This offset is preserved when walking ghosts
-	local ghostTargetPos = ghost.PrimaryPart.Position:Lerp(orbPos, 0.6)
+	local ghostTargetPos = ghost.PrimaryPart.Position:Lerp(orbPos, 0.7)
 	Orb.GhostOffsets[ghost.Name] = ghostTargetPos - orbPos
 
 	-- Make the ghost look towards the speaker, if there is one
