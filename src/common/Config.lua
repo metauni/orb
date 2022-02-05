@@ -14,7 +14,7 @@ local Config = {
 	BlackHaloName = "BlackHalo",
 	HaloOffset = 3,
 	HaloSize = 2,
-	GhostSpawnInterval = 5,
+	GhostSpawnInterval = 3,
 	GhostSpawnRadius = 50
 }
 
