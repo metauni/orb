@@ -141,6 +141,13 @@ function Orb.Init()
 		waypoint.CanCollide = false
 	end
 
+	task.spawn(function()
+		while true do
+			task.wait(Config.GhostSpawnInterval)
+			Orb.CheckGhosts()
+		end
+	end)
+
 	print("[Orb] Server ".. Config.Version .." initialized")
 end
 
@@ -474,8 +481,6 @@ function Orb.Attach(orb, playerId)
 
 	if CollectionService:HasTag(orb, Config.TransportTag) then
 		Orb.AddLuggage(orb, playerId)
-	else
-		Orb.AddPlayer(orb, playerId)
 	end
 end
 
@@ -578,52 +583,56 @@ function Orb.RotateGhosts(orb)
 	end
 end
 
+function Orb.WalkGhost(orb, pos, ghost)
+	-- Maintain relative positioning
+	local offset = Orb.GhostOffsets[ghost.Name]
+	local newPos
+
+	if offset ~= nil then
+		newPos = pos + offset
+	else
+		newPos = pos - orb:GetPivot().Position + ghost.PrimaryPart.Position
+	end
+	
+	-- If we're already on our way, don't repeat it
+	local alreadyMoving = (Orb.GhostTargets[ghost.Name] ~= nil) and (Orb.GhostTargets[ghost.Name] - newPos).Magnitude < 0.01
+
+	if not alreadyMoving then
+		ghost.Humanoid:MoveTo(newPos)
+
+		Orb.GhostTargets[ghost.Name] = newPos
+
+		local animator = ghost.Humanoid:FindFirstChild("Animator")
+		local animation = animator:LoadAnimation(Common.WalkAnim)
+		animation:Play()
+
+		local connection
+		connection = ghost.Humanoid.MoveToFinished:Connect(function(reached)
+			animation:Stop()
+
+			-- If it was too far for the ghost to reach, just teleport them
+			if not reached then
+				local speakerPos = Orb.GetSpeakerPosition(orb)
+				if speakerPos ~= nil then
+					ghost:PivotTo(CFrame.lookAt(newPos, speakerPos))
+				else
+					ghost.PrimaryPart.Position = newPos
+				end
+			else
+				Orb.RotateGhostToFaceSpeaker(orb, ghost)
+			end
+
+			Orb.GhostTargets[ghost.Name] = nil
+			connection:Disconnect()
+			connection = nil
+		end)
+	end
+end
+
 function Orb.WalkGhosts(orb, pos)
 	-- Animate all the ghosts
 	for _, ghost in ipairs(orb.Ghosts:GetChildren()) do
-		-- Maintain relative positioning
-		local offset = Orb.GhostOffsets[ghost.Name]
-		local newPos
-
-		if offset ~= nil then
-			newPos = pos + offset
-		else
-			newPos = pos - orb:GetPivot().Position + ghost.PrimaryPart.Position
-		end
-		
-		-- If we're already on our way, don't repeat it
-		local alreadyMoving = (Orb.GhostTargets[ghost.Name] ~= nil) and (Orb.GhostTargets[ghost.Name] - newPos).Magnitude < 0.01
-
-		if not alreadyMoving then
-			ghost.Humanoid:MoveTo(newPos)
-
-			Orb.GhostTargets[ghost.Name] = newPos
-
-			local animator = ghost.Humanoid:FindFirstChild("Animator")
-			local animation = animator:LoadAnimation(Common.WalkAnim)
-			animation:Play()
-
-			local connection
-			connection = ghost.Humanoid.MoveToFinished:Connect(function(reached)
-				animation:Stop()
-
-				-- If it was too far for the ghost to reach, just teleport them
-				if not reached then
-					local speakerPos = Orb.GetSpeakerPosition(orb)
-					if speakerPos ~= nil then
-						ghost:PivotTo(CFrame.lookAt(newPos, speakerPos))
-					else
-						ghost.PrimaryPart.Position = newPos
-					end
-				else
-					Orb.RotateGhostToFaceSpeaker(orb, ghost)
-				end
-
-				Orb.GhostTargets[ghost.Name] = nil
-				connection:Disconnect()
-				connection = nil
-			end)
-		end
+		Orb.WalkGhost(orb, pos, ghost)
 	end
 end
 
@@ -699,27 +708,63 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 	return orb:GetPivot().Position
 end
 
+-- If a player is attached to an orb and is more than a set distance from the orb
+-- then a representative (their "ghost") is spawned to be near the orb in their stead
+function Orb.CheckGhosts()
+	for _, plr in ipairs(Players:GetPlayers()) do
+		local character = plr.Character
+		if character == nil then continue end
+		if character.PrimaryPart == nil then continue end
+
+		local orb = Orb.Attachments[tostring(plr.UserId)]
+		if orb == nil then continue end
+
+		local playerPos = character.PrimaryPart.Position
+
+		local ghostExists = false
+		for _, ghost in ipairs(orb.Ghosts:GetChildren()) do
+			if ghost.Name == tostring(plr.UserId) then
+				ghostExists = true
+			end
+		end
+
+		if (orb:GetPivot().Position - playerPos).Magnitude > Config.GhostSpawnRadius then
+			-- Spawn a ghost if none exists
+			if not ghostExists then
+				Orb.AddGhost(orb, plr)
+			end
+		else
+			-- Destroy the ghost if it exists
+			if ghostExists then
+				Orb.RemoveGhost(orb, plr.UserId)
+			end
+		end
+	end
+end
+
 function Orb.AddGhost(orb, plr)
 	local character = plr.Character
 	character.Archivable = true
 	local ghost = plr.Character:Clone()
 	character.Archivable = false
 
+	local orbPos = orb:GetPivot().Position
 	ghost.Name = tostring(plr.UserId)
-	local distanceOrbPlayer = (orb:GetPivot().Position - character.PrimaryPart.Position).Magnitude
-	local ghostPos = ghost.PrimaryPart.Position - distanceOrbPlayer * ghost.PrimaryPart.CFrame.LookVector
-	ghostPos += Vector3.new(0,0.3,0) -- pop them up in the air a bit
+	local distanceOrbPlayer = (orbPos - character.PrimaryPart.Position).Magnitude
+	local ghostNowPos = ghost.PrimaryPart.Position:Lerp(orbPos, 0.1)
+	ghostNowPos += Vector3.new(0,2,0) -- pop them up in the air a bit
 
 	-- This offset is preserved when walking ghosts
-	Orb.GhostOffsets[ghost.Name] = ghostPos - orb:GetPivot().Position
+	local ghostTargetPos = ghost.PrimaryPart.Position:Lerp(orbPos, 0.6)
+	Orb.GhostOffsets[ghost.Name] = ghostTargetPos - orbPos
 
 	-- Make the ghost look towards the speaker, if there is one
 	local speakerPos = Orb.GetSpeakerPosition(orb)
 	if speakerPos then
-		local speakerPosXZ = Vector3.new(speakerPos.X,ghostPos.Y,speakerPos.Z)
-		ghost:PivotTo(CFrame.lookAt(ghostPos, speakerPosXZ))
+		local speakerPosXZ = Vector3.new(speakerPos.X,ghostNowPos.Y,speakerPos.Z)
+		ghost:PivotTo(CFrame.lookAt(ghostNowPos, speakerPosXZ))
 	else
-		ghost:PivotTo(CFrame.lookAt(ghostPos, character.PrimaryPart.Position))
+		ghost:PivotTo(CFrame.lookAt(ghostNowPos, character.PrimaryPart.Position))
 	end
 
 	for _, desc in ipairs(ghost:GetDescendants()) do
@@ -730,6 +775,7 @@ function Orb.AddGhost(orb, plr)
 	end
 
 	ghost.Parent = orb.Ghosts
+	task.delay( 0.5, Orb.WalkGhost, orb, orbPos, ghost)
 end
 
 function Orb.GetGhost(orb, playerId)
@@ -745,18 +791,6 @@ function Orb.GetGhost(orb, playerId)
 	end
 
 	return nil
-end
-
-function Orb.AddPlayer(orb, listenerID)
-	if orb == nil then
-		print("[Orb] ERROR - Attempted to add listener to nil")
-		return
-	end
-
-	local plr = Players:GetPlayerByUserId(listenerID)
-	if plr then
-		Orb.AddGhost(orb, plr)
-	end
 end
 
 function Orb.RemoveGhost(orb, playerId)

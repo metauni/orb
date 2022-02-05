@@ -4,7 +4,7 @@ local Config = {
 	WaypointTag = "metaorb_waypoint",
 	PointOfInterestTag = "metaorb_poi",
 	DataStoreTag = "orb.",
-	Version = "0.4.3",
+	Version = "0.5.0",
 	TweenTime = 5,
 	RopeLength = 10,
 	TransportWaitTime = 10,
@@ -13,7 +13,9 @@ local Config = {
 	WhiteHaloName = "WhiteHalo",
 	BlackHaloName = "BlackHalo",
 	HaloOffset = 3,
-	HaloSize = 2
+	HaloSize = 2,
+	GhostSpawnInterval = 5,
+	GhostSpawnRadius = 50
 }
 
 Config.Defaults = {
