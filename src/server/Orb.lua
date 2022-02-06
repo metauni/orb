@@ -718,6 +718,7 @@ function Orb.CheckGhosts()
 
 		local orb = Orb.Attachments[tostring(plr.UserId)]
 		if orb == nil then continue end
+		if CollectionService:HasTag(orb, Config.TransportTag) then continue end
 
 		local playerPos = character.PrimaryPart.Position
 
