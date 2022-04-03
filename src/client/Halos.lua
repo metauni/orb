@@ -37,7 +37,7 @@ function Halos.Init()
         local earRing = orb:FindFirstChild("EarRing")
         local eyeRing = orb:FindFirstChild("EyeRing")
 
-        if earRing then
+        if earRing ~= nil then
             local whiteHalo = earRing:Clone()
             whiteHalo.Name = Config.WhiteHaloName
             whiteHalo.Transparency = 1
@@ -49,7 +49,7 @@ function Halos.Init()
             end
         end
 
-        if eyeRing then
+        if eyeRing ~= nil then
             local blackHalo = eyeRing:Clone()
             blackHalo.Name = Config.BlackHaloName
             blackHalo.Transparency = 1

@@ -138,14 +138,14 @@ function Gui.Init()
 	-- overwrites the default "true" state of HasWritePermission
 	local adminEvents = game:GetService("ReplicatedStorage"):FindFirstChild("MetaAdmin")
 	if adminEvents then
-		local isScribeRF = adminEvents:FindFirstChild("IsScribe")
+		local isScribeRF = adminEvents:WaitForChild("IsScribe")
 
 		if isScribeRF then
 			Gui.HasSpeakerPermission = isScribeRF:InvokeServer()
 		end
 
 		-- Listen for updates to the permissions
-		local permissionUpdateRE = adminEvents:FindFirstChild("PermissionsUpdate")
+		local permissionUpdateRE = adminEvents:WaitForChild("PermissionsUpdate")
 		permissionUpdateRE.OnClientEvent:Connect(function()
 			-- Request the new permission
 			if isScribeRF then
