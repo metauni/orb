@@ -29,7 +29,10 @@ local peekButton, detachSpeakerButton, speakerViewportFrame
 local returnButtonSpeaker, peekButtonSpeaker, luggageGui
 local peekButtonLuggage, detachLuggageButton
 local localPlayer
+
 local storedCameraOffset = nil
+local storedCameraFOV = nil
+local targetForOrbTween = {} -- orb to target position and poi of tween
 
 local Gui = {}
 Gui.__index = Gui
@@ -568,11 +571,11 @@ local function resetCameraSubject()
     end
 end
 
-function Gui.OrbTweeningStart(orb, newPos, poiPos)
+function Gui.OrbTweeningStart(orb, newPos, poiPos, poi)
     -- Start camera moving if it is enabled, and the tweening
     -- orb is the one we are attached to
     if Gui.Orb and orb == Gui.Orb and Gui.Orbcam then
-        Gui.OrbcamTweeningStart(newPos, poiPos)
+        Gui.OrbcamTweeningStart(newPos, poiPos, poi)
     end
 
     -- Turn off proximity prompts on this orb
@@ -580,6 +583,12 @@ function Gui.OrbTweeningStart(orb, newPos, poiPos)
     local speakerPrompt = if orb:IsA("BasePart") then orb.SpeakerPrompt else orb.PrimaryPart.SpeakerPrompt
     normalPrompt.Enabled = false
     speakerPrompt.Enabled = false
+
+    -- Store this so people attaching mid-flight can just jump to the target CFrame and FOV
+    local orbCameraPos = Vector3.new(newPos.X, poiPos.Y, newPos.Z)
+    targetForOrbTween[orb] = { Position = orbCameraPos, 
+                                Poi = poi }
+
     orb:SetAttribute("tweening", true)
 end
 
@@ -592,11 +601,12 @@ function Gui.OrbTweeningStop(orb)
         speakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == nil
     end
 
+    targetForOrbTween[orb] = nil
     orb:SetAttribute("tweening", false)
 end
 
 -- Note that we will refuse to move the camera if there is nothing to look _at_
-function Gui.OrbcamTweeningStart(newPos, poiPos)
+function Gui.OrbcamTweeningStart(newPos, poiPos, poi)
     if not Gui.Orbcam then return end
     if newPos == nil or poiPos == nil then return end
 
@@ -611,24 +621,161 @@ function Gui.OrbcamTweeningStart(newPos, poiPos)
 		)
 
     local orbCameraPos = Vector3.new(newPos.X, poiPos.Y, newPos.Z)
+    local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
 
-    Gui.CameraTween = TweenService:Create(camera, tweenInfo, 
-        {CFrame = CFrame.lookAt(orbCameraPos, poiPos)})
+    if verticalFOV == nil then
+        Gui.CameraTween = TweenService:Create(camera, tweenInfo, 
+            {CFrame = CFrame.lookAt(orbCameraPos, poiPos)})
+    else
+        Gui.CameraTween = TweenService:Create(camera, tweenInfo, 
+            {CFrame = CFrame.lookAt(orbCameraPos, poiPos),
+            FieldOfView = verticalFOV})
+    end
 
     Gui.CameraTween:Play()
+end
+
+-- Computes the vertical FOV for the player's camera at the given poi
+function Gui.FOVForPoi(cameraPos, poi)
+    if poi == nil then return end
+
+    -- Adjust the zoom level
+    local targets = {}
+    for _, c in ipairs(poi:GetChildren()) do
+        if c:IsA("ObjectValue") and c.Name == "Target" then
+            if c.Value ~= nil then
+                table.insert(targets, c.Value)
+            end
+        end
+    end
+
+    if #targets == 0 then
+        return
+    end
+
+    local cameraCFrame = CFrame.lookAt(cameraPos, poi:GetPivot().Position)
+    local camera = workspace.CurrentCamera
+    local oldCameraCFrame = camera.CFrame
+    local oldCameraFieldOfView = camera.FieldOfView
+    camera.CFrame = cameraCFrame
+    camera.FieldOfView = 70
+
+    -- Find the most extreme points among all targets
+    local extremeLeftCoord, extremeRightCoord, extremeTopCoord, extremeBottomCoord
+    local extremeLeft, extremeRight, extremeTop, extremeBottom
+
+    for _, t in ipairs(targets) do
+        local extremities = {}
+        local unitVectors = { X = Vector3.new(1,0,0),
+                                Y = Vector3.new(0,1,0),
+                                Z = Vector3.new(0,0,1)}
+
+        for _, direction in ipairs({"X", "Y", "Z"}) do
+            local extremeOne = t.CFrame * CFrame.new(0.5 * unitVectors[direction] * t.Size[direction])
+            local extremeTwo = t.CFrame * CFrame.new(-0.5 * unitVectors[direction] * t.Size[direction])
+            table.insert(extremities, extremeOne.Position)
+            table.insert(extremities, extremeTwo.Position)
+        end
+
+        for _, pos in ipairs(extremities) do
+            local screenPos = camera:WorldToScreenPoint(pos)
+            if extremeLeftCoord == nil or screenPos.X < extremeLeftCoord then
+                extremeLeftCoord = screenPos.X
+                extremeLeft = pos
+            end
+
+            if extremeRightCoord == nil or screenPos.X > extremeRightCoord then
+                extremeRightCoord = screenPos.X
+                extremeRight = pos
+            end
+
+            if extremeTopCoord == nil or screenPos.Y < extremeTopCoord then
+                extremeTopCoord = screenPos.Y
+                extremeTop = pos
+            end
+
+            if extremeBottomCoord == nil or screenPos.Y > extremeBottomCoord then
+                extremeBottomCoord = screenPos.Y
+                extremeBottom = pos
+            end
+        end
+    end
+
+    if extremeTop == nil or extremeBottom == nil or extremeLeft == nil or extremeRight == nil then
+        camera.CFrame = oldCameraCFrame
+        camera.FieldOfView = oldCameraFieldOfView
+        return
+    end
+
+    -- Compute the angles made with the current camera and the top and bottom
+    local leftProj = camera.CFrame:ToObjectSpace(CFrame.new(extremeLeft)).Position
+    local rightProj = camera.CFrame:ToObjectSpace(CFrame.new(extremeRight)).Position
+    local topProj = camera.CFrame:ToObjectSpace(CFrame.new(extremeTop)).Position
+    local bottomProj = camera.CFrame:ToObjectSpace(CFrame.new(extremeBottom)).Position
+    local xMid = 0.5 * (leftProj.X + rightProj.X)
+    local yMid = 0.5 * (topProj.Y + bottomProj.Y)
+    
+    local avgZ = 0.25 * ( leftProj.Z + rightProj.Z + topProj.Z + bottomProj.Z )
+    topProj = Vector3.new(xMid, topProj.Y, avgZ)
+    bottomProj = Vector3.new(xMid, bottomProj.Y, avgZ)
+    leftProj = Vector3.new(leftProj.X, yMid, avgZ)
+    rightProj = Vector3.new(rightProj.X, yMid, avgZ)
+    
+    --for _, apos in ipairs({leftProj, rightProj, topProj, bottomProj}) do
+    --	if apos ~= nil then
+    --		local pos = camera.CFrame:ToWorldSpace(CFrame.new(apos)).Position
+    --		local p = Instance.new("Part")
+    --		p.Name = "Bounder"
+    --		p.Shape = Enum.PartType.Ball
+    --		p.Color = Color3.new(0,0,1)
+    --		p.Size = Vector3.new(0.5, 0.5, 0.5)
+    --		p.Position = pos
+    --		p.Anchored = true
+    --		p.Parent = game.workspace
+    --	end
+    --end
+
+    -- Compute the horizontal angle subtended by rectangle we have just defined
+    local A = leftProj.Magnitude
+    local B = rightProj.Magnitude
+    local cosgamma = leftProj:Dot(rightProj) * 1/A * 1/B
+    local horizontalAngle = nil
+
+    if cosgamma < -1 or cosgamma > 1 then 
+        camera.CFrame = oldCameraCFrame
+        camera.FieldOfView = oldCameraFieldOfView
+        return
+    end
+    
+    horizontalAngle = math.acos(cosgamma)
+    
+    -- https://en.wikipedia.org/wiki/Field_of_view_in_video_games
+    local aspectRatio = camera.ViewportSize.Y / camera.ViewportSize.X
+    local verticalRadian = 2 * math.atan(math.tan(horizontalAngle / 2) * aspectRatio)
+    local verticalFOV = math.deg(verticalRadian)
+    verticalFOV = verticalFOV * Config.FOVFactor
+    -- print("[Orb] Discovered vertical FOV is "..verticalFOV)
+
+    -- Return camera to its original configuration
+    camera.CFrame = oldCameraCFrame
+    camera.FieldOfView = oldCameraFieldOfView
+
+    return verticalFOV
 end
 
 function Gui.OrbcamOn(guiOff)
     OrbcamOnRemoteEvent:FireServer()
 
     if Gui.Orb == nil then return end
+    local orb = Gui.Orb
 
     local poi, poiPos = Gui.PointOfInterest()
     if poi == nil or poiPos == nil then return end
 
 	local camera = workspace.CurrentCamera
-	
-    local orbPos = Gui.Orb:GetPivot().Position
+	storedCameraFOV = camera.FieldOfView
+
+    local orbPos = orb:GetPivot().Position
     
     local character = localPlayer.Character
 	if character and character.Head then
@@ -639,7 +786,6 @@ function Gui.OrbcamOn(guiOff)
         -- A transport orb looks from the next stop back to the orb
         -- as it approaches
         camera.CameraType = Enum.CameraType.Watch
-        local orb = Gui.Orb
         camera.CameraSubject = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
         local nextStop = orb.NextStop.Value
@@ -651,10 +797,26 @@ function Gui.OrbcamOn(guiOff)
             camera.CameraType = Enum.CameraType.Scriptable
         end
 
-        -- If we are a normal orb we look from a height adjusted
-        -- to the point of interest
-        local orbCameraPos = Vector3.new(orbPos.X, poiPos.Y, orbPos.Z)
-        camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
+        -- If we are a normal orb we look from a height adjusted to the point of interest
+        if targetForOrbTween[orb] == nil then
+            -- The orb is not tweening
+            local orbCameraPos = Vector3.new(orbPos.X, poiPos.Y, orbPos.Z)
+            camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
+
+            local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
+            if verticalFOV ~= nil then
+                camera.FieldOfView = verticalFOV
+            end
+        else
+            -- The orb is tweening, jump to the target CFrame and FOV
+            local tweenData = targetForOrbTween[orb]
+            local verticalFOV = Gui.FOVForPoi(tweenData.Position, tweenData.Poi)
+            camera.CFrame = CFrame.lookAt(tweenData.Position, tweenData.Poi:GetPivot().Position)
+
+            if verticalFOV ~= nil then
+                camera.FieldOfView = verticalFOV
+            end
+        end
     end
     
     if guiOff then
@@ -692,6 +854,11 @@ function Gui.OrbcamOff(guiOff)
 	
 	local camera = workspace.CurrentCamera
 	camera.CameraType = Enum.CameraType.Custom
+    if storedCameraFOV ~= nil then
+        camera.FieldOfView = storedCameraFOV
+    else
+        camera.FieldOfView = 70
+    end
 
     if Gui.Speaking then speakerGui.Enabled = true end
     if Gui.Orb ~= nil and not Gui.Speaking and not CollectionService:HasTag(Gui.Orb, Config.TransportTag) then

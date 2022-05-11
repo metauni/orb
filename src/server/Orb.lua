@@ -678,7 +678,7 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 			0 -- DelayTime
 		)
 	
-		local poiPos = Orb.PointOfInterest(minWaypoint.Position)
+		local poi, poiPos = Orb.PointOfInterest(minWaypoint.Position)
 		
 		local orbTween
 		local orbToTween = if orb:IsA("BasePart") then orb else orb.PrimaryPart
@@ -700,7 +700,7 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 		orbTween:Play()
 
 		-- Announce this tween to clients
-		OrbTweeningStartRemoteEvent:FireAllClients(orb, minWaypoint.Position, poiPos)
+		OrbTweeningStartRemoteEvent:FireAllClients(orb, minWaypoint.Position, poiPos, poi)
 
 		return minWaypoint.Position
 	end
@@ -847,6 +847,7 @@ function Orb.PointOfInterest(targetPos)
 
     -- Find the closest board
     local closestPos = nil
+	local closestPoi = nil
     local minDistance = math.huge
 
     local families = {boards, pois}
@@ -861,11 +862,12 @@ function Orb.PointOfInterest(targetPos)
 			if distance < minDistance then
 				minDistance = distance
 				closestPos = pos
+				closestPoi = p
 			end
         end
     end
 
-    return closestPos
+    return closestPoi, closestPos
 end
 
 return Orb
