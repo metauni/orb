@@ -1,5 +1,4 @@
 local Players = game:GetService("Players")
-local ListenerGui = Players.LocalPlayer.PlayerGui:WaitForChild("OrbGui", math.huge)
 local SoundService = game:GetService("SoundService")
 
 local localPlayer = Players.LocalPlayer

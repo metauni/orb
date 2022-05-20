@@ -1,3 +1,4 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Common = game:GetService("ReplicatedStorage").OrbCommon
 local SoundService = game:GetService("SoundService")
 local ContextActionService = game:GetService("ContextActionService")
@@ -24,9 +25,7 @@ local OrbListenOffRemoteEvent = Common.Remotes.OrbListenOff
 local OrbcamOnRemoteEvent = Common.Remotes.OrbcamOn
 local OrbcamOffRemoteEvent = Common.Remotes.OrbcamOff
 
-local listenerGui, speakerGui, listenButton, detachButton, returnButton
-local peekButton, detachSpeakerButton, speakerViewportFrame
-local returnButtonSpeaker, peekButtonSpeaker, luggageGui
+local luggageGui
 local peekButtonLuggage, detachLuggageButton
 local localPlayer
 
@@ -39,8 +38,6 @@ Gui.__index = Gui
 
 function Gui.Init()
     localPlayer = Players.LocalPlayer
-    listenerGui = localPlayer.PlayerGui:WaitForChild("OrbGui",math.huge)
-    speakerGui = localPlayer.PlayerGui:WaitForChild("OrbGuiSpeaker",math.huge)
     luggageGui = localPlayer.PlayerGui:WaitForChild("OrbGuiLuggage",math.huge)
     Gui.Listening = false
     Gui.Speaking = false
@@ -59,17 +56,12 @@ function Gui.Init()
     Gui.Ear = nil
     Gui.EarConnection = nil
     Gui.CharacterChildAddedConnection = nil
+    Gui.ListenIcon = nil
+    Gui.OrbcamIcon = nil
+    Gui.SpeakerIcon = nil
 
     Gui.InitEar()
 
-    listenButton = listenerGui:WaitForChild("ListenButton")
-    detachButton = listenerGui:WaitForChild("DetachButton")
-    detachSpeakerButton = speakerGui:WaitForChild("DetachButton")
-    returnButton = listenerGui:WaitForChild("ReturnButton")
-    peekButton = listenerGui:WaitForChild("PeekButton")
-    speakerViewportFrame = speakerGui:WaitForChild("ViewportFrame")
-    returnButtonSpeaker = speakerGui:WaitForChild("ReturnButton")
-    peekButtonSpeaker = speakerGui:WaitForChild("PeekButton")
     peekButtonLuggage = luggageGui:WaitForChild("PeekButton")
     detachLuggageButton = luggageGui:WaitForChild("DetachButton")
 
@@ -85,53 +77,13 @@ function Gui.Init()
         end
     end
 
-    listenButton.Activated:Connect(toggleListen)
-
     -- 
     -- Attach and detach
     --
 
-    detachButton.Activated:Connect(Gui.Detach)
-    detachSpeakerButton.Activated:Connect(Gui.Detach)
     detachLuggageButton.Activated:Connect(Gui.Detach)
     OrbAttachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.RefreshPrompts)
     OrbDetachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.RefreshPrompts)
-
-    -- 
-    -- Teleporting
-    --
-
-    returnButton.Activated:Connect(function()
-        -- Teleport us to our ghost
-        OrbTeleportRemoteEvent:FireServer(Gui.Orb)
-    end)
-
-    returnButtonSpeaker.Activated:Connect(function()
-        -- Teleport us to our orb
-        OrbTeleportRemoteEvent:FireServer(Gui.Orb)
-    end)
-
-    --
-    -- Viewport
-    --
-
-    local function peekButtonActivated(button)
-        Gui.ToggleOrbcam(false)
-
-        if Gui.Orbcam then
-            button.BackgroundColor3 = Color3.new(1,1,1)
-        else
-            button.BackgroundColor3 = Color3.new(0,0,0)
-        end
-    end
-
-    peekButton.Activated:Connect(function()
-        peekButtonActivated(peekButton)
-    end)
-
-    peekButtonSpeaker.Activated:Connect(function()
-        peekButtonActivated(peekButtonSpeaker)
-    end)
 
     peekButtonLuggage.Activated:Connect(function()
         peekButtonActivated(peekButtonLuggage)
@@ -242,12 +194,6 @@ function Gui.Init()
         end
     end
 
-    -- Setup a camera on the speaker viewport frame
-    local viewportCamera = Instance.new("Camera")
-    viewportCamera.Name = "Camera"
-	speakerViewportFrame.CurrentCamera = viewportCamera
-	viewportCamera.Parent = speakerViewportFrame
-
     -- Setup Orbcam
     local ORBCAM_MACRO_KB = {Enum.KeyCode.LeftShift, Enum.KeyCode.C}
     local function CheckMacro(macro)
@@ -273,6 +219,8 @@ function Gui.Init()
     -- Handle orb tweening
     OrbTweeningStartRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStart)
     OrbTweeningStopRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStop)
+
+    Gui.CreateTopbarItems()
 
 	print("[Orb] Gui Initialised")
 end
@@ -403,7 +351,6 @@ end
 
 function Gui.ListenOn()
     Gui.Listening = true
-    listenButton.BackgroundTransparency = 0.2
 
     if Gui.Orb then
         -- Enum.ListenerType.ObjectPosition (if player rotates camera, it changes angle of sound sources)
@@ -418,7 +365,6 @@ end
 
 function Gui.ListenOff()
     Gui.Listening = false
-    listenButton.BackgroundTransparency = 0.75
 
     if Config.ListenFromPlayer and Gui.Ear ~= nil then
         SoundService:SetListener(Enum.ListenerType.ObjectCFrame, Gui.Ear)
@@ -452,11 +398,7 @@ function Gui.Detach()
         Gui.ListenOff()
         Gui.OrbcamOff()
         Gui.Speaking = false
-        listenerGui.Enabled = false
-        speakerGui.Enabled = false
-        peekButton.BackgroundColor3 = Color3.new(0,0,0)
-        peekButtonSpeaker.BackgroundColor3 = Color3.new(0,0,0)
-
+        
         if Gui.RunningConnection then
             Gui.RunningConnection:Disconnect()
             Gui.RunningConnection = nil
@@ -465,36 +407,6 @@ function Gui.Detach()
 
     OrbDetachRemoteEvent:FireServer(orb)
     Gui.Orb = nil
-end
-
-function Gui.PopulateViewportSpeaker()
-    local oldOrb = speakerViewportFrame:FindFirstChild("Orb")
-    if oldOrb then oldOrb:Destroy() end
-    if not Gui.Orb then return end
-
-    local orbClone = Gui.Orb:Clone()
-
-    -- Remove tags
-    for _, tag in ipairs(CollectionService:GetTags(orbClone)) do
-        CollectionService:RemoveTag(orbClone, tag)
-    end
-
-    -- Get rid of rings
-    local eyeRingClone = orbClone:FindFirstChild("EyeRing")
-    if eyeRingClone then
-        eyeRingClone:Destroy()
-    end
-
-    local earRingClone = orbClone:FindFirstChild("EarRing")
-    if earRingClone then
-        earRingClone:Destroy()
-    end
-    
-    orbClone:PivotTo(CFrame.new(0,0,0))
-    orbClone.Name = "Orb"
-    orbClone.Parent = speakerViewportFrame
-    local orbSize = if orbClone:IsA("BasePart") then orbClone.Size else orbClone.PrimaryPart.Size
-    speakerViewportFrame.Camera.CFrame = CFrame.new(Vector3.new(0, 1.3 * orbSize.Y, 0), Vector3.new(0,0,0))
 end
 
 function Gui.AttachSpeaker(orb)
@@ -510,9 +422,9 @@ function Gui.AttachSpeaker(orb)
     Gui.Orb = orb
     Gui.Speaking = true
 
-    -- Setup the viewport to show a copy of the orb
-    Gui.PopulateViewportSpeaker()
-    speakerGui.Enabled = true
+    Gui.SpeakerIcon:setEnabled(true)
+    Gui.SpeakerIcon:select()
+    Gui.OrbcamIcon:setEnabled(true)
 
     -- This event fires when the running speed changes
     local humanoid = localPlayer.Character:WaitForChild("Humanoid")
@@ -522,6 +434,68 @@ function Gui.AttachSpeaker(orb)
             OrbSpeakerMovedRemoteEvent:FireServer(Gui.Orb)
         end
     end)
+end
+
+function Gui.CreateTopbarItems()
+    if ReplicatedStorage:FindFirstChild("Icon") == nil then
+        print("[Orb] Could not find Icon module")
+        return
+    end
+    
+    -- ear icon is https://fonts.google.com/icons?icon.query=hearing
+    -- eye icon is https://fonts.google.com/icons?icon.query=eye
+    local Icon = require(game:GetService("ReplicatedStorage").Icon)
+    local Themes =  require(game:GetService("ReplicatedStorage").Icon.Themes)
+    
+    local icon, iconEye, iconSpeaker
+
+    icon = Icon.new()
+    icon:setImage("rbxassetid://9675350772")
+    icon:setLabel("Listen as Orb")
+    icon:setEnabled(false)
+    icon.deselectWhenOtherIconSelected = false
+    icon:bindEvent("deselected", function(self)
+        if iconEye.isSelected then
+            iconEye:deselect()
+        end
+        
+        Gui.Detach()
+        iconEye:setEnabled(false)
+        icon:setEnabled(false)
+    end)
+    icon:setTheme(Themes["BlueGradient"])
+    Gui.ListenIcon = icon
+
+    iconSpeaker = Icon.new()
+    iconSpeaker:setImage("rbxassetid://9675604658")
+    iconSpeaker:setLabel("Attached as Speaker")
+    iconSpeaker:setTheme(Themes["BlueGradient"])
+    iconSpeaker:setEnabled(false)
+    iconSpeaker.deselectWhenOtherIconSelected = false
+    iconSpeaker:bindEvent("deselected", function(self)
+        if iconEye.isSelected then
+            iconEye:deselect()
+        end
+        
+        Gui.Detach()
+        iconEye:setEnabled(false)
+        iconSpeaker:setEnabled(false)
+    end)
+    Gui.SpeakerIcon = iconSpeaker
+
+    iconEye = Icon.new()
+    iconEye:setImage("rbxassetid://9675397382")
+    iconEye:setLabel("Orbcam")
+    iconEye:setTheme(Themes["BlueGradient"])
+    iconEye:setEnabled(false)
+    iconEye.deselectWhenOtherIconSelected = false
+    iconEye:bindEvent("selected", function(self)
+        Gui.ToggleOrbcam(false)
+    end)
+    iconEye:bindEvent("deselected", function(self)
+        Gui.ToggleOrbcam(false)
+    end)
+    Gui.OrbcamIcon = iconEye
 end
 
 function Gui.Attach(orb)
@@ -539,7 +513,10 @@ function Gui.Attach(orb)
         local speakerPrompt = if orb:IsA("BasePart") then orb.SpeakerPrompt else orb.PrimaryPart.SpeakerPrompt
         normalPrompt.Enabled = false
         speakerPrompt.Enabled = false
-        listenerGui.Enabled = true
+        --listenerGui.Enabled = true
+        Gui.ListenIcon:setEnabled(true)
+        Gui.ListenIcon:select()
+        Gui.OrbcamIcon:setEnabled(true)
         Gui.ListenOn()
     end
 end
@@ -822,9 +799,6 @@ function Gui.OrbcamOn(guiOff)
     if guiOff then
         if CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
             luggageGui.Enabled = false
-        else
-            speakerGui.Enabled = false
-            listenerGui.Enabled = false
         end
 
         StarterGui:SetCore("TopbarEnabled", false)
@@ -841,12 +815,6 @@ function Gui.OrbcamOff(guiOff)
     if guiOff then
         if CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
             luggageGui.Enabled = true
-        else
-            if Gui.Speaking then
-                speakerGui.Enabled = true
-            elseif Gui.Orb ~= nil then
-                listenerGui.Enabled = true
-            end
         end
 
 	    StarterGui:SetCore("TopbarEnabled", true)
@@ -860,9 +828,8 @@ function Gui.OrbcamOff(guiOff)
         camera.FieldOfView = 70
     end
 
-    if Gui.Speaking then speakerGui.Enabled = true end
     if Gui.Orb ~= nil and not Gui.Speaking and not CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
-        listenerGui.Enabled = true
+        --listenerGui.Enabled = true
     end
 	
 	resetCameraSubject()
