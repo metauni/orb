@@ -14,7 +14,7 @@
 		"ServerScriptService": {
 			"$ignoreUnknownInstances": true,
 			"$className": "ServerScriptService",
-			"OrbServer": {
+			"metaorb": {
 				"$className": "Folder",
 				"$path": "src/server"
 			}
@@ -30,12 +30,6 @@
 					"$path": "src/client"
 				}
 			}
-		},
-
-		"StarterGui": {
-			"$className": "StarterGui",
-			"$ignoreUnknownInstances": true,
-			"$path": "src/StarterGui"
 		}
 	}
 }

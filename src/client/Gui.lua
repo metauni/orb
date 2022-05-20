@@ -25,8 +25,6 @@ local OrbListenOffRemoteEvent = Common.Remotes.OrbListenOff
 local OrbcamOnRemoteEvent = Common.Remotes.OrbcamOn
 local OrbcamOffRemoteEvent = Common.Remotes.OrbcamOff
 
-local luggageGui
-local peekButtonLuggage, detachLuggageButton
 local localPlayer
 
 local storedCameraOffset = nil
@@ -38,7 +36,6 @@ Gui.__index = Gui
 
 function Gui.Init()
     localPlayer = Players.LocalPlayer
-    luggageGui = localPlayer.PlayerGui:WaitForChild("OrbGuiLuggage",math.huge)
     Gui.Listening = false
     Gui.Speaking = false
 
@@ -59,11 +56,10 @@ function Gui.Init()
     Gui.ListenIcon = nil
     Gui.OrbcamIcon = nil
     Gui.SpeakerIcon = nil
+    Gui.LuggageIcon = nil
+    Gui.OrbcamGuiOff = false
 
     Gui.InitEar()
-
-    peekButtonLuggage = luggageGui:WaitForChild("PeekButton")
-    detachLuggageButton = luggageGui:WaitForChild("DetachButton")
 
     -- 
     -- Listening
@@ -81,17 +77,12 @@ function Gui.Init()
     -- Attach and detach
     --
 
-    detachLuggageButton.Activated:Connect(Gui.Detach)
     OrbAttachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.RefreshPrompts)
     OrbDetachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.RefreshPrompts)
 
-    peekButtonLuggage.Activated:Connect(function()
-        peekButtonActivated(peekButtonLuggage)
-    end)
-
     -- If the Admin system is installed, the permission specified there
 	-- overwrites the default "true" state of HasWritePermission
-	local adminEvents = game:GetService("ReplicatedStorage"):FindFirstChild("MetaAdmin")
+	local adminEvents = ReplicatedStorage:FindFirstChild("MetaAdmin")
 	if adminEvents then
 		local isScribeRF = adminEvents:WaitForChild("IsScribe")
 
@@ -202,7 +193,20 @@ function Gui.Init()
                 return
             end
         end
-        Gui.ToggleOrbcam(true)
+
+        -- Do not allow Shift-C to turn _off_ orbcam that was turned on
+        -- via the topbar button
+        if Gui.Orbcam and not Gui.OrbcamGuiOff then
+            return
+        end
+
+        if Gui.OrbcamIcon:getToggleState() == "selected" then
+            Gui.OrbcamIcon:deselect()
+            Gui.OrbcamGuiOff = false
+        else
+            Gui.OrbcamGuiOff = true
+            Gui.OrbcamIcon:select()
+        end
     end
 
     local function HandleActivationInput(action, state, input)
@@ -381,11 +385,9 @@ function Gui.Detach()
     local orb = Gui.Orb
 
     if CollectionService:HasTag(orb, Config.TransportTag) then
-        luggageGui.Enabled = false
         local luggagePrompt = if orb:IsA("BasePart") then orb.LuggagePrompt else orb.PrimaryPart.LuggagePrompt
         luggagePrompt.Enabled = true
         Gui.OrbcamOff()
-        peekButtonLuggage.BackgroundColor3 = Color3.new(0,0,0)
     else
         -- If the orb is currently on the move, do not enable it yet
         if not orb:GetAttribute("tweening") then
@@ -444,14 +446,15 @@ function Gui.CreateTopbarItems()
     
     -- ear icon is https://fonts.google.com/icons?icon.query=hearing
     -- eye icon is https://fonts.google.com/icons?icon.query=eye
+    -- luggage is https://fonts.google.com/icons?icon.query=luggage
     local Icon = require(game:GetService("ReplicatedStorage").Icon)
     local Themes =  require(game:GetService("ReplicatedStorage").Icon.Themes)
     
-    local icon, iconEye, iconSpeaker
+    local icon, iconEye, iconSpeaker, iconLuggage
 
     icon = Icon.new()
     icon:setImage("rbxassetid://9675350772")
-    icon:setLabel("Listen as Orb")
+    icon:setLabel("Attached as Listener")
     icon:setEnabled(false)
     icon.deselectWhenOtherIconSelected = false
     icon:bindEvent("deselected", function(self)
@@ -483,6 +486,23 @@ function Gui.CreateTopbarItems()
     end)
     Gui.SpeakerIcon = iconSpeaker
 
+    iconLuggage = Icon.new()
+    iconLuggage:setImage("rbxassetid://9679458066")
+    iconLuggage:setLabel("Attached as Luggage")
+    iconLuggage:setTheme(Themes["BlueGradient"])
+    iconLuggage:setEnabled(false)
+    iconLuggage.deselectWhenOtherIconSelected = false
+    iconLuggage:bindEvent("deselected", function(self)
+        if iconEye.isSelected then
+            iconEye:deselect()
+        end
+        
+        Gui.Detach()
+        iconEye:setEnabled(false)
+        iconLuggage:setEnabled(false)
+    end)
+    Gui.LuggageIcon = iconLuggage
+
     iconEye = Icon.new()
     iconEye:setImage("rbxassetid://9675397382")
     iconEye:setLabel("Orbcam")
@@ -506,14 +526,17 @@ function Gui.Attach(orb)
     if CollectionService:HasTag(orb, Config.TransportTag) then
         local luggagePrompt = if orb:IsA("BasePart") then orb.LuggagePrompt else orb.PrimaryPart.LuggagePrompt
         luggagePrompt.Enabled = false
-        luggageGui.Enabled = true
+
+        Gui.LuggageIcon:setEnabled(true)
+        Gui.LuggageIcon:select()
+        Gui.OrbcamIcon:setEnabled(true)
     else
         -- Disable the proximity prompt
         local normalPrompt = if orb:IsA("BasePart") then orb.NormalPrompt else orb.PrimaryPart.NormalPrompt
         local speakerPrompt = if orb:IsA("BasePart") then orb.SpeakerPrompt else orb.PrimaryPart.SpeakerPrompt
         normalPrompt.Enabled = false
         speakerPrompt.Enabled = false
-        --listenerGui.Enabled = true
+        
         Gui.ListenIcon:setEnabled(true)
         Gui.ListenIcon:select()
         Gui.OrbcamIcon:setEnabled(true)
@@ -731,7 +754,6 @@ function Gui.FOVForPoi(cameraPos, poi)
     local verticalRadian = 2 * math.atan(math.tan(horizontalAngle / 2) * aspectRatio)
     local verticalFOV = math.deg(verticalRadian)
     verticalFOV = verticalFOV * Config.FOVFactor
-    -- print("[Orb] Discovered vertical FOV is "..verticalFOV)
 
     -- Return camera to its original configuration
     camera.CFrame = oldCameraCFrame
@@ -740,7 +762,8 @@ function Gui.FOVForPoi(cameraPos, poi)
     return verticalFOV
 end
 
-function Gui.OrbcamOn(guiOff)
+function Gui.OrbcamOn()
+    local guiOff = Gui.OrbcamGuiOff
     OrbcamOnRemoteEvent:FireServer()
 
     if Gui.Orb == nil then return end
@@ -797,26 +820,19 @@ function Gui.OrbcamOn(guiOff)
     end
     
     if guiOff then
-        if CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
-            luggageGui.Enabled = false
-        end
-
         StarterGui:SetCore("TopbarEnabled", false)
     end
 
     Gui.Orbcam = true
 end
 
-function Gui.OrbcamOff(guiOff)
+function Gui.OrbcamOff()
+    local guiOff = Gui.OrbcamGuiOff
     OrbcamOffRemoteEvent:FireServer()
 
 	if Gui.CameraTween then Gui.CameraTween:Cancel() end
 
     if guiOff then
-        if CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
-            luggageGui.Enabled = true
-        end
-
 	    StarterGui:SetCore("TopbarEnabled", true)
     end
 	
@@ -827,22 +843,16 @@ function Gui.OrbcamOff(guiOff)
     else
         camera.FieldOfView = 70
     end
-
-    if Gui.Orb ~= nil and not Gui.Speaking and not CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
-        --listenerGui.Enabled = true
-    end
 	
 	resetCameraSubject()
     Gui.Orbcam = false
 end
 
--- guiOff sets whether we turn off the topbar and other
--- GUI elements, i.e. for when we use Shift-C
-function Gui.ToggleOrbcam(guiOff)
+function Gui.ToggleOrbcam()
     if Gui.Orbcam then
-		Gui.OrbcamOff(guiOff)
+		Gui.OrbcamOff()
 	elseif not Gui.Orbcam and Gui.Orb ~= nil then
-        Gui.OrbcamOn(guiOff)
+        Gui.OrbcamOn()
 	end
 end
 

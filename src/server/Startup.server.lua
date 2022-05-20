@@ -16,10 +16,11 @@ do
 		orbPlayer.Parent = game:GetService("StarterPlayer").StarterPlayerScripts
 	end
 
-	local orbGuiLuggage = script.Parent:FindFirstChild("OrbGuiLuggage")
-	if orbGuiLuggage then
-		orbGuiLuggage.Parent = game:GetService("StarterGui")
-	end
+	-- Clients run their own init when they see this appear in PlayerGui
+	local orbDummyGui = Instance.new("ScreenGui")
+	orbDummyGui.Name = "OrbDummyGui"
+	orbDummyGui.Enabled = false
+	orbDummyGui.Parent = game:GetService("StarterGui")
 end
 
 local Orb = require(script.Parent.Orb)

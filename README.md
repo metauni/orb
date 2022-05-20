@@ -58,6 +58,6 @@ remodel run orb_packager.lua
 
 The first command builds a place file according to `default.project.json`.
 The second command uses [remodel](https://github.com/rojo-rbx/remodel) to extract all of the components of the Orb system,
-and packages them all within the `OrbServer` folder, and exports this
+and packages them all within the `metaorb` folder, and exports this
 as a `metaorb.rbxmx` file. The startup server script then redistributes these
 components on world boot.
