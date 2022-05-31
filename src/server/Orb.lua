@@ -232,7 +232,7 @@ function Orb.InitAVOrb(orb)
 	announceSound.RollOffMinDistance = 10
 	announceSound.Playing = false
 	announceSound.Looped = false
-	announceSound.Volume = 0.3
+	announceSound.Volume = 0.2
 	announceSound.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
 	-- Sound to announce speaker detach
@@ -244,7 +244,7 @@ function Orb.InitAVOrb(orb)
 	detachSpeakerSound.RollOffMinDistance = 10
 	detachSpeakerSound.Playing = false
 	detachSpeakerSound.Looped = false
-	detachSpeakerSound.Volume = 0.3
+	detachSpeakerSound.Volume = 0.2
 	detachSpeakerSound.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
 	-- Create the rings which indicate the look and hear directions of this orb
@@ -504,7 +504,7 @@ function Orb.Detach(orb, playerId)
 			if plight then plight.Enabled = false end
 
 			-- Notify clients that the speaker detached
-			OrbDetachSpeakerRemoteEvent:FireAllClients(nil, orb)
+			OrbDetachSpeakerRemoteEvent:FireAllClients(orb)
 		end
 	end
 end

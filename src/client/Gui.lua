@@ -57,6 +57,7 @@ function Gui.Init()
     Gui.OrbcamIcon = nil
     Gui.SpeakerIcon = nil
     Gui.LuggageIcon = nil
+    Gui.OrbReturnIcon = nil
     Gui.OrbcamGuiOff = false
 
     Gui.InitEar()
@@ -101,13 +102,7 @@ function Gui.Init()
             -- Update the visibility of speaker prompts
             local orbs = CollectionService:GetTagged(Config.ObjectTag)
             for _, orb in ipairs(orbs) do
-                local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
-
-                -- If we are not currently attached as either or speaker
-                -- or listener, make the speaker prompt enabled
-                if speakerPrompt and not Gui.Orb == orb then
-                    speakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == nil
-                end
+                Gui.RefreshPrompts(orb)
             end
 		end)
 	end
@@ -302,13 +297,13 @@ function Gui.RemoveEar()
 end
 
 -- Refresh the visibility of the normal and speaker proximity prompts
-function Gui.RefreshPrompts(speaker, orb)
+function Gui.RefreshPrompts(orb)
     local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
 
     -- If we are not currently attached as either or speaker
     -- or listener, make the speaker prompt enabled
     if speakerPrompt ~= nil and Gui.Orb ~= orb then
-        speakerPrompt.Enabled = Gui.HasSpeakerPermission and speaker == nil and not orb:GetAttribute("tweening")
+        speakerPrompt.Enabled = Gui.HasSpeakerPermission and not orb:GetAttribute("tweening")
     end
 end
 
@@ -427,6 +422,7 @@ function Gui.AttachSpeaker(orb)
     Gui.SpeakerIcon:setEnabled(true)
     Gui.SpeakerIcon:select()
     Gui.OrbcamIcon:setEnabled(true)
+    Gui.OrbReturnIcon:setEnabled(true)
 
     -- This event fires when the running speed changes
     local humanoid = localPlayer.Character:WaitForChild("Humanoid")
@@ -447,14 +443,15 @@ function Gui.CreateTopbarItems()
     -- ear icon is https://fonts.google.com/icons?icon.query=hearing
     -- eye icon is https://fonts.google.com/icons?icon.query=eye
     -- luggage is https://fonts.google.com/icons?icon.query=luggage
+    -- return is https://fonts.google.com/icons?icon.query=back
     local Icon = require(game:GetService("ReplicatedStorage").Icon)
     local Themes =  require(game:GetService("ReplicatedStorage").Icon.Themes)
     
-    local icon, iconEye, iconSpeaker, iconLuggage
+    local icon, iconEye, iconSpeaker, iconLuggage, iconReturn
 
     icon = Icon.new()
     icon:setImage("rbxassetid://9675350772")
-    icon:setLabel("Attached as Listener")
+    icon:setLabel("Listener")
     icon:setEnabled(false)
     icon.deselectWhenOtherIconSelected = false
     icon:bindEvent("deselected", function(self)
@@ -465,13 +462,14 @@ function Gui.CreateTopbarItems()
         Gui.Detach()
         iconEye:setEnabled(false)
         icon:setEnabled(false)
+        iconReturn:setEnabled(false)
     end)
     icon:setTheme(Themes["BlueGradient"])
     Gui.ListenIcon = icon
 
     iconSpeaker = Icon.new()
     iconSpeaker:setImage("rbxassetid://9675604658")
-    iconSpeaker:setLabel("Attached as Speaker")
+    iconSpeaker:setLabel("Speaker")
     iconSpeaker:setTheme(Themes["BlueGradient"])
     iconSpeaker:setEnabled(false)
     iconSpeaker.deselectWhenOtherIconSelected = false
@@ -483,12 +481,13 @@ function Gui.CreateTopbarItems()
         Gui.Detach()
         iconEye:setEnabled(false)
         iconSpeaker:setEnabled(false)
+        iconReturn:setEnabled(false)
     end)
     Gui.SpeakerIcon = iconSpeaker
 
     iconLuggage = Icon.new()
     iconLuggage:setImage("rbxassetid://9679458066")
-    iconLuggage:setLabel("Attached as Luggage")
+    iconLuggage:setLabel("Luggage")
     iconLuggage:setTheme(Themes["BlueGradient"])
     iconLuggage:setEnabled(false)
     iconLuggage.deselectWhenOtherIconSelected = false
@@ -516,6 +515,16 @@ function Gui.CreateTopbarItems()
         Gui.ToggleOrbcam(false)
     end)
     Gui.OrbcamIcon = iconEye
+
+    iconReturn = Icon.new()
+    iconReturn:setImage("rbxassetid://9727704068")
+    iconReturn:setTheme(Themes["BlueGradient"])
+    iconReturn:setEnabled(false)
+    iconReturn:bindEvent("selected", function(self)
+        OrbTeleportRemoteEvent:FireServer(Gui.Orb)
+        iconReturn:deselect()
+    end)
+    Gui.OrbReturnIcon = iconReturn
 end
 
 function Gui.Attach(orb)
@@ -540,6 +549,7 @@ function Gui.Attach(orb)
         Gui.ListenIcon:setEnabled(true)
         Gui.ListenIcon:select()
         Gui.OrbcamIcon:setEnabled(true)
+        Gui.OrbReturnIcon:setEnabled(true)
         Gui.ListenOn()
     end
 end
@@ -598,7 +608,7 @@ function Gui.OrbTweeningStop(orb)
         local normalPrompt = if orb:IsA("BasePart") then orb.NormalPrompt else orb.PrimaryPart.NormalPrompt
         local speakerPrompt = if orb:IsA("BasePart") then orb.SpeakerPrompt else orb.PrimaryPart.SpeakerPrompt
         normalPrompt.Enabled = true
-        speakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == nil
+        speakerPrompt.Enabled = Gui.HasSpeakerPermission and (orb.Speaker.Value == nil)
     end
 
     targetForOrbTween[orb] = nil
