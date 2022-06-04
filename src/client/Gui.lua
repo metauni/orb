@@ -349,7 +349,7 @@ function Gui.PointOfInterest()
         end
     end
 
-    return closestPoi, closestPos
+    return closestPoi
 end
 
 function Gui.ListenOn()
@@ -657,7 +657,19 @@ function Gui.OrbcamTweeningStart(newPos, poi)
 			0 -- DelayTime
 		)
 
+
+    -- By default the camera looks from (newPos.X, poiPos.Y, newPos.Z)
+    -- but this can be overridden by specifying a Camera ObjectValue
     local orbCameraPos = Vector3.new(newPos.X, poiPos.Y, newPos.Z)
+
+    local cameraOverride = poi:FindFirstChild("Camera")
+    if cameraOverride ~= nil then
+        local cameraPart = cameraOverride.Value
+        if cameraPart ~= nil then
+            orbCameraPos = cameraPart.Position
+        end
+    end
+
     local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
 
     if verticalFOV == nil then
@@ -832,32 +844,46 @@ function Gui.OrbcamOn()
         return
     end
 
-    local poi, poiPos = Gui.PointOfInterest()
-    if poi == nil or poiPos == nil then return end
-    local orbPos = orb:GetPivot().Position
-    
+    -- If the orb is tweening, we use the stored data for poi
+    local tweenData = targetForOrbTween[orb]
+
+    local poi = nil
+    local orbPos = nil
+
+    if tweenData ~= nil then
+        poi = tweenData.Poi
+        orbPos = tweenData.Waypoint.Position
+    else
+        poi = Gui.PointOfInterest()
+        orbPos = orb:GetPivot().Position
+    end
+
+    if poi == nil or orbPos == nil then
+        print("[Orb] Could not find point of interest to look at")
+        return
+    end
+
     if camera.CameraType ~= Enum.CameraType.Scriptable then
         camera.CameraType = Enum.CameraType.Scriptable
     end
 
-    local orbCameraPos = Vector3.new(orbPos.X, poiPos.Y, orbPos.Z)
-    local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
+    local poiPos = poi:GetPivot().Position    
 
-    -- If the orb is tweening, override the default camera settings to look
-    -- from its destination rather than its current position
-    if targetForOrbTween[orb] ~= nil then
-        local tweenData = targetForOrbTween[orb]
-        local poi = tweenData.Poi
-        local waypoint = tweenData.Waypoint
-        if poi ~= nil and waypoint ~= nil then
-            poiPos = poi:GetPivot().Position
-            newPos = waypoint.Position
-            orbCameraPos = Vector3.new(newPos.X, poiPos.Y, newPos.Z)
-            verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
+    -- By default the camera looks from (orbPos.X, poiPos.Y, orbPos.Z)
+    -- but this can be overridden by specifying a Camera ObjectValue
+    local orbCameraPos = Vector3.new(orbPos.X, poiPos.Y, orbPos.Z)
+
+    local cameraOverride = poi:FindFirstChild("Camera")
+    if cameraOverride ~= nil then
+        local cameraPart = cameraOverride.Value
+        if cameraPart ~= nil then
+            orbCameraPos = cameraPart.Position
         end
     end
     
     camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
+
+    local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
     camera.FieldOfView = verticalFOV
 
     if guiOff then
