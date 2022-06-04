@@ -654,7 +654,7 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 		end
 	end
 
-	if minWaypoint then
+	if minWaypoint ~= nil then
 		-- If we are already there, don't tween
 		if (minWaypoint.Position - orb:GetPivot().Position).Magnitude < 0.01 then
 			return orb:GetPivot().Position
@@ -700,7 +700,7 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 		orbTween:Play()
 
 		-- Announce this tween to clients
-		OrbTweeningStartRemoteEvent:FireAllClients(orb, minWaypoint.Position, poiPos, poi)
+		OrbTweeningStartRemoteEvent:FireAllClients(orb, minWaypoint, poi)
 
 		return minWaypoint.Position
 	end

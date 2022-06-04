@@ -2,11 +2,15 @@
 
 Orbs are audiovisual devices with the following features:
 
-* Any user can attach to an orb as a *listener* and hear whatever audio the orb hears. They leave behind a ghost near the orb as an indicator to others that they are potentially listening.
+* Any user can attach to an orb as a *listener* and hear whatever audio the orb hears.
 
 * Users with the right permission can attach to an orb as a *speaker*. The orb will then follow the speaker using *waypoints*.
 
 * Orbs are the basis of the automated recording system in metauni. When an orb is at a waypoint it will orient itself towards the nearest *point of interest* and this is used by the camera system to record audio and video (for example of talks).
+
+* Optionally a point of interest can have children `ObjectValue`s named `Target` which point to `BasePart`s. In this case the OrbCam's field of view will be automatically calculated so as to put these `BasePart`s inside the view.
+
+* By default the OrbCam view looks from the `X` and `Z` coordinate of the orb, and the `Y` coordinate of the point of interest (for example this puts the view at the mid-height of a metaboard). However optionally a waypoint can have a child `ObjectValue` named `Camera` which points to a `BasePart` whose position is used as the camera position, overriding the default.
 
 There is an [introductory video](https://youtu.be/0vuNKcCv1sk). In more detail
 

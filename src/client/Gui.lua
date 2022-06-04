@@ -78,8 +78,12 @@ function Gui.Init()
     -- Attach and detach
     --
 
-    OrbAttachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.RefreshPrompts)
-    OrbDetachSpeakerRemoteEvent.OnClientEvent:Connect(Gui.RefreshPrompts)
+    OrbAttachSpeakerRemoteEvent.OnClientEvent:Connect(function(speaker,orb)
+        Gui.RefreshPrompts(orb)
+    end)
+    OrbDetachSpeakerRemoteEvent.OnClientEvent:Connect(function(orb)
+        Gui.RefreshPrompts(orb)
+    end)
 
     -- If the Admin system is installed, the permission specified there
 	-- overwrites the default "true" state of HasWritePermission
@@ -581,11 +585,25 @@ local function resetCameraSubject()
     end
 end
 
-function Gui.OrbTweeningStart(orb, newPos, poiPos, poi)
+function Gui.OrbTweeningStart(orb, waypoint, poi)
+    if orb == nil then
+        print("[Orb] OrbTweeningStart passed a nil orb")
+        return
+    end
+
+    if waypoint == nil then
+        print("[Orb] OrbTweeningStart passed a nil waypoint")
+        return
+    end
+
+    if poi == nil then
+        print("[Orb] Warning: OrbTweeningStart passed a nil poi")
+    end
+
     -- Start camera moving if it is enabled, and the tweening
     -- orb is the one we are attached to
     if Gui.Orb and orb == Gui.Orb and Gui.Orbcam then
-        Gui.OrbcamTweeningStart(newPos, poiPos, poi)
+        Gui.OrbcamTweeningStart(waypoint.Position, poi)
     end
 
     -- Turn off proximity prompts on this orb
@@ -595,8 +613,7 @@ function Gui.OrbTweeningStart(orb, newPos, poiPos, poi)
     speakerPrompt.Enabled = false
 
     -- Store this so people attaching mid-flight can just jump to the target CFrame and FOV
-    local orbCameraPos = Vector3.new(newPos.X, poiPos.Y, newPos.Z)
-    targetForOrbTween[orb] = { Position = orbCameraPos, 
+    targetForOrbTween[orb] = { Waypoint = waypoint,
                                 Poi = poi }
 
     orb:SetAttribute("tweening", true)
@@ -616,9 +633,19 @@ function Gui.OrbTweeningStop(orb)
 end
 
 -- Note that we will refuse to move the camera if there is nothing to look _at_
-function Gui.OrbcamTweeningStart(newPos, poiPos, poi)
-    if not Gui.Orbcam then return end
-    if newPos == nil or poiPos == nil then return end
+function Gui.OrbcamTweeningStart(newPos, poi)
+    if Gui.Orbcam == nil then return end
+    if newPos == nil then
+        print("[Orb] OrbcamTweeningStart passed a nil position")
+        return
+    end
+    
+    if poi == nil then
+        print("[Orb] OrbcamTweeningStart passed a nil poi")
+        return
+    end
+
+    local poiPos = poi:GetPivot().Position
 
     local camera = workspace.CurrentCamera
 	local tweenInfo = TweenInfo.new(
@@ -778,14 +805,9 @@ function Gui.OrbcamOn()
 
     if Gui.Orb == nil then return end
     local orb = Gui.Orb
-
-    local poi, poiPos = Gui.PointOfInterest()
-    if poi == nil or poiPos == nil then return end
-
+    
 	local camera = workspace.CurrentCamera
 	storedCameraFOV = camera.FieldOfView
-
-    local orbPos = orb:GetPivot().Position
     
     local character = localPlayer.Character
 	if character and character.Head then
@@ -793,8 +815,7 @@ function Gui.OrbcamOn()
 	end
     
     if CollectionService:HasTag(Gui.Orb, Config.TransportTag) then
-        -- A transport orb looks from the next stop back to the orb
-        -- as it approaches
+        -- A transport orb looks from the next stop back to the orb as it approaches
         camera.CameraType = Enum.CameraType.Watch
         camera.CameraSubject = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
@@ -802,33 +823,43 @@ function Gui.OrbcamOn()
         local nextStopPart = orb.Stops:FindFirstChild(tostring(nextStop)).Value.Marker
 
         camera.CFrame = CFrame.new(nextStopPart.Position + Vector3.new(0,20,0))
-    else
-        if camera.CameraType ~= Enum.CameraType.Scriptable then
-            camera.CameraType = Enum.CameraType.Scriptable
+
+        if guiOff then
+            StarterGui:SetCore("TopbarEnabled", false)
         end
+    
+        Gui.Orbcam = true
+        return
+    end
 
-        -- If we are a normal orb we look from a height adjusted to the point of interest
-        if targetForOrbTween[orb] == nil then
-            -- The orb is not tweening
-            local orbCameraPos = Vector3.new(orbPos.X, poiPos.Y, orbPos.Z)
-            camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
+    local poi, poiPos = Gui.PointOfInterest()
+    if poi == nil or poiPos == nil then return end
+    local orbPos = orb:GetPivot().Position
+    
+    if camera.CameraType ~= Enum.CameraType.Scriptable then
+        camera.CameraType = Enum.CameraType.Scriptable
+    end
 
-            local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
-            if verticalFOV ~= nil then
-                camera.FieldOfView = verticalFOV
-            end
-        else
-            -- The orb is tweening, jump to the target CFrame and FOV
-            local tweenData = targetForOrbTween[orb]
-            local verticalFOV = Gui.FOVForPoi(tweenData.Position, tweenData.Poi)
-            camera.CFrame = CFrame.lookAt(tweenData.Position, tweenData.Poi:GetPivot().Position)
+    local orbCameraPos = Vector3.new(orbPos.X, poiPos.Y, orbPos.Z)
+    local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
 
-            if verticalFOV ~= nil then
-                camera.FieldOfView = verticalFOV
-            end
+    -- If the orb is tweening, override the default camera settings to look
+    -- from its destination rather than its current position
+    if targetForOrbTween[orb] ~= nil then
+        local tweenData = targetForOrbTween[orb]
+        local poi = tweenData.Poi
+        local waypoint = tweenData.Waypoint
+        if poi ~= nil and waypoint ~= nil then
+            poiPos = poi:GetPivot().Position
+            newPos = waypoint.Position
+            orbCameraPos = Vector3.new(newPos.X, poiPos.Y, newPos.Z)
+            verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
         end
     end
     
+    camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
+    camera.FieldOfView = verticalFOV
+
     if guiOff then
         StarterGui:SetCore("TopbarEnabled", false)
     end
