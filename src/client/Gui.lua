@@ -686,7 +686,11 @@ end
 
 -- Computes the vertical FOV for the player's camera at the given poi
 function Gui.FOVForPoi(cameraPos, poi)
-    if poi == nil then return end
+    local camera = workspace.CurrentCamera
+
+    if poi == nil then
+        return camera.FieldOfView
+    end
 
     -- Adjust the zoom level
     local targets = {}
@@ -699,11 +703,10 @@ function Gui.FOVForPoi(cameraPos, poi)
     end
 
     if #targets == 0 then
-        return
+        return camera.FieldOfView
     end
 
     local cameraCFrame = CFrame.lookAt(cameraPos, poi:GetPivot().Position)
-    local camera = workspace.CurrentCamera
     local oldCameraCFrame = camera.CFrame
     local oldCameraFieldOfView = camera.FieldOfView
     camera.CFrame = cameraCFrame
