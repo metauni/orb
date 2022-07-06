@@ -8,6 +8,7 @@ local CollectionService = game:GetService("CollectionService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
+local VRService = game:GetService("VRService")
 
 local Players = game:GetService("Players")
 local Config = require(Common.Config)
@@ -24,6 +25,8 @@ local OrbListenOnRemoteEvent = Common.Remotes.OrbListenOn
 local OrbListenOffRemoteEvent = Common.Remotes.OrbListenOff
 local OrbcamOnRemoteEvent = Common.Remotes.OrbcamOn
 local OrbcamOffRemoteEvent = Common.Remotes.OrbcamOff
+local VRSpeakerChalkEquipRemoteEvent = Common.Remotes.VRSpeakerChalkEquip
+local VRSpeakerChalkUnequipRemoteEvent = Common.Remotes.VRSpeakerChalkUnequip
 
 local localPlayer
 
@@ -195,9 +198,10 @@ function Gui.Init()
 
         -- Do not allow Shift-C to turn _off_ orbcam that was turned on
         -- via the topbar button
-        if Gui.Orbcam and not Gui.OrbcamGuiOff then
-            return
-        end
+        if Gui.Orbcam and not Gui.OrbcamGuiOff then return end
+
+        -- Do not allow the shortcut when not attached
+        if Gui.Orb == nil then return end
 
         if Gui.OrbcamIcon:getToggleState() == "selected" then
             Gui.OrbcamIcon:deselect()
@@ -223,9 +227,65 @@ function Gui.Init()
     OrbTweeningStartRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStart)
     OrbTweeningStopRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStop)
 
+    -- In VR we need to tell other clients when we equip the chalk
+    if VRService.VREnabled then
+        local chalkTool = localPlayer.Backpack:WaitForChild("MetaChalk", 20)
+        if chalkTool ~= nil then
+            chalkTool.Equipped:Connect(function()
+                VRSpeakerChalkEquipRemoteEvent:FireServer()
+            end)
+            chalkTool.Unequipped:Connect(function()
+                VRSpeakerChalkUnequipRemoteEvent:FireServer()
+            end)
+        else
+            print("[MetaOrb] Failed to find MetaChalk tool")
+        end
+    end
+	
+    Gui.HandleVR()
     Gui.CreateTopbarItems()
 
 	print("[Orb] Gui Initialised")
+end
+
+function Gui.MakePlayerTransparent(plr, transparency)
+    if plr == nil then
+        print("[MetaOrb] Passed nil player to MakePlayerTransparent")
+        return
+    end
+
+    if plr.Character == nil then return end
+
+    local character = plr.Character
+
+    for _, desc in ipairs(character:GetDescendants()) do
+		if desc:IsA("BasePart") then
+			desc.Transparency = 1 - (transparency * (1 - desc.Transparency))
+			desc.CastShadow = false
+		end
+	end
+
+    -- origTransparency = 1 - 1/0.2 * (1 - newTransparency)
+end
+
+function Gui.HandleVR()
+    VRSpeakerChalkEquipRemoteEvent.OnClientEvent:Connect(function(speaker)
+		if Gui.Orb == nil then return end
+        if Gui.Orb.Speaker.Value == nil then return end
+        if Gui.Orb.Speaker.Value ~= speaker then return end
+
+        if speaker == localPlayer then return end
+        Gui.MakePlayerTransparent(speaker, 0.2)
+	end)
+
+    VRSpeakerChalkUnequipRemoteEvent.OnClientEvent:Connect(function(speaker)
+		if Gui.Orb == nil then return end
+        if Gui.Orb.Speaker.Value == nil then return end
+        if Gui.Orb.Speaker.Value ~= speaker then return end
+
+        if speaker == localPlayer then return end
+        Gui.MakePlayerTransparent(speaker, 1/0.2)
+	end)
 end
 
 -- We create a part inside the player's head, whose CFrame
@@ -430,12 +490,32 @@ function Gui.AttachSpeaker(orb)
 
     -- This event fires when the running speed changes
     local humanoid = localPlayer.Character:WaitForChild("Humanoid")
-    Gui.RunningConnection = humanoid.Running:Connect(function(speed)
-        if speed == 0 then
-            -- They were moving and then stood still
-            OrbSpeakerMovedRemoteEvent:FireServer(Gui.Orb)
-        end
-    end)
+    if VRService.VREnabled then
+        local counter = 0
+        local timeTillPositionCheck = 2
+        local playerPosAtLastCheck = localPlayer.Character.PrimaryPart.Position
+
+        Gui.RunningConnection = RunService.Heartbeat:Connect(function(step)
+            counter = counter + step
+            if counter >= timeTillPositionCheck then
+                counter -= timeTillPositionCheck
+                
+                if localPlayer.Character ~= nil and localPlayer.Character.PrimaryPart ~= nil then
+                    if (localPlayer.Character.PrimaryPart.Position - playerPosAtLastCheck).Magnitude > 2 then
+                        OrbSpeakerMovedRemoteEvent:FireServer(Gui.Orb)
+                    end
+                    playerPosAtLastCheck = localPlayer.Character.PrimaryPart.Position
+                end
+            end
+        end)
+    else
+        Gui.RunningConnection = humanoid.Running:Connect(function(speed)
+            if speed == 0 then
+                -- They were moving and then stood still
+                OrbSpeakerMovedRemoteEvent:FireServer(Gui.Orb)
+            end
+        end)
+    end
 end
 
 function Gui.CreateTopbarItems()

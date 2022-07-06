@@ -60,6 +60,14 @@
 		{
 			"Name": "GetAttachments",
 			"ClassName": "RemoteFunction"
+		},
+		{
+			"Name": "VRSpeakerChalkEquip",
+			"ClassName": "RemoteEvent"
+		},
+		{
+			"Name": "VRSpeakerChalkUnequip",
+			"ClassName": "RemoteEvent"
 		}
 	]
 }

@@ -21,6 +21,8 @@ local OrbcamOffRemoteEvent = Common.Remotes.OrbcamOff
 local GetOrbcamStatusRemoteFunction = Common.Remotes.GetOrbcamStatus
 local GetListeningStatusRemoteFunction = Common.Remotes.GetListeningStatus
 local GetAttachmentsRemoteFunction = Common.Remotes.GetAttachments
+local VRSpeakerChalkEquipRemoteEvent = Common.Remotes.VRSpeakerChalkEquip
+local VRSpeakerChalkUnequipRemoteEvent = Common.Remotes.VRSpeakerChalkUnequip
 
 local speakerAttachSoundIds = { 7873470625, 7873470425,
 7873469842, 7873470126, 7864771146, 7864770493, 8214755036, 8214754703}
@@ -146,6 +148,14 @@ function Orb.Init()
 			task.wait(Config.GhostSpawnInterval)
 			Orb.CheckGhosts()
 		end
+	end)
+
+	VRSpeakerChalkEquipRemoteEvent.OnServerEvent:Connect(function(plr)
+		VRSpeakerChalkEquipRemoteEvent:FireAllClients(plr)
+	end)
+
+	VRSpeakerChalkUnequipRemoteEvent.OnServerEvent:Connect(function(plr)
+		VRSpeakerChalkUnequipRemoteEvent:FireAllClients(plr)
 	end)
 
 	print("[Orb] Server ".. Config.Version .." initialized")
@@ -554,7 +564,15 @@ function Orb.PlayAttachSpeakerSound(orb, changeSound)
 end
 
 function Orb.RotateGhostToFaceSpeaker(orb, ghost)
-	if not ghost then return end
+	if ghost == nil then
+		print("[MetaOrb] Passed nil ghost")
+		return
+	end
+
+	if ghost.PrimaryPart == nil then
+		print("[MetaOrb] Ghost has nil primary part")
+		return
+	end
 
 	local speakerPos = Orb.GetSpeakerPosition(orb)
 	if not speakerPos then return end
