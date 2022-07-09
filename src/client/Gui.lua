@@ -232,10 +232,14 @@ function Gui.Init()
         local chalkTool = localPlayer.Backpack:WaitForChild("MetaChalk", 20)
         if chalkTool ~= nil then
             chalkTool.Equipped:Connect(function()
-                VRSpeakerChalkEquipRemoteEvent:FireServer()
+                if Gui.Orb == nil then return end
+                if Gui.Speaking == false then return end
+                VRSpeakerChalkEquipRemoteEvent:FireServer(Gui.Orb)
             end)
             chalkTool.Unequipped:Connect(function()
-                VRSpeakerChalkUnequipRemoteEvent:FireServer()
+                if Gui.Orb == nil then return end
+                if Gui.Speaking == false then return end
+                VRSpeakerChalkUnequipRemoteEvent:FireServer(Gui.Orb)
             end)
         else
             print("[MetaOrb] Failed to find MetaChalk tool")
@@ -464,6 +468,12 @@ function Gui.Detach()
             Gui.RunningConnection:Disconnect()
             Gui.RunningConnection = nil
         end
+
+        -- Make the VR speaker visible again
+        local speaker = Gui.Orb.Speaker.Value
+        if speaker ~= nil and orb.VRSpeakerChalkEquipped.Value then
+            Gui.MakePlayerTransparent(speaker, 1/0.2)
+        end
     end
 
     OrbDetachRemoteEvent:FireServer(orb)
@@ -612,7 +622,11 @@ function Gui.CreateTopbarItems()
 end
 
 function Gui.Attach(orb)
-    -- Disconnect from the old source if there is one
+    if orb == nil then
+        print("[MetaOrb] Attempted to attach to nil orb")
+        return
+    end
+
     if Gui.Orb then Gui.Detach() end
     Gui.Orb = orb
 
@@ -635,6 +649,12 @@ function Gui.Attach(orb)
         Gui.OrbcamIcon:setEnabled(true)
         Gui.OrbReturnIcon:setEnabled(true)
         Gui.ListenOn()
+
+        -- Set up initial transparency for VR speakers
+        local speaker = Gui.Orb.Speaker.Value
+        if speaker ~= nil and orb.VRSpeakerChalkEquipped.Value then
+            Gui.MakePlayerTransparent(speaker, 0.2)
+        end
     end
 end
 

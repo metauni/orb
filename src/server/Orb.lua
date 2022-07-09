@@ -150,12 +150,14 @@ function Orb.Init()
 		end
 	end)
 
-	VRSpeakerChalkEquipRemoteEvent.OnServerEvent:Connect(function(plr)
+	VRSpeakerChalkEquipRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		VRSpeakerChalkEquipRemoteEvent:FireAllClients(plr)
+		orb.VRSpeakerChalkEquipped.Value = true
 	end)
 
-	VRSpeakerChalkUnequipRemoteEvent.OnServerEvent:Connect(function(plr)
+	VRSpeakerChalkUnequipRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		VRSpeakerChalkUnequipRemoteEvent:FireAllClients(plr)
+		orb.VRSpeakerChalkEquipped.Value = false
 	end)
 
 	print("[Orb] Server ".. Config.Version .." initialized")
@@ -210,6 +212,14 @@ function Orb.InitAVOrb(orb)
 		speaker.Name = "Speaker"
 		speaker.Value = nil
 		speaker.Parent = orb
+	end
+
+	local VRspeaker = orb:FindFirstChild("VRSpeakerChalkEquipped")
+	if VRspeaker == nil then
+		VRspeaker = Instance.new("BoolValue")
+		VRspeaker.Name = "VRSpeakerChalkEquipped"
+		VRspeaker.Value = false
+		VRspeaker.Parent = orb
 	end
 
 	-- Add ghosts folder
