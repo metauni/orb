@@ -48,6 +48,7 @@ function Gui.Init()
 
     Gui.Orb = nil
     Gui.RunningConnection = nil
+    Gui.VROrbcamConnection = nil
     Gui.ViewportOn = false
     Gui.HasSpeakerPermission = true -- can attach as speaker?
     Gui.Orbcam = false
@@ -133,6 +134,10 @@ function Gui.Init()
             luggagePrompt.RequiresLineOfSight = false
             luggagePrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
 
+            if VRService.VREnabled then
+                luggagePrompt.Enabled = false
+            end
+
             ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
                 if prompt == luggagePrompt and prompt.Name == "LuggagePrompt" then
                     OrbAttachRemoteEvent:FireServer(orb)
@@ -185,6 +190,27 @@ function Gui.Init()
                 end
             end)
         end
+
+        if VRService.VREnabled then
+            local vrOrbcamPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("VROrbcamPrompt") else orb.PrimaryPart:FindFirstChild("VROrbcamPrompt")
+            if vrOrbcamPrompt == nil then
+                vrOrbcamPrompt = Instance.new("ProximityPrompt")
+                vrOrbcamPrompt.Name = "VROrbcamPrompt"
+                vrOrbcamPrompt.ActionText = "Enable Orbcam"
+                vrOrbcamPrompt.MaxActivationDistance = 8
+                vrOrbcamPrompt.HoldDuration = 1
+                vrOrbcamPrompt.ObjectText = "Orb"
+                vrOrbcamPrompt.RequiresLineOfSight = false
+                vrOrbcamPrompt.Enabled = false
+                vrOrbcamPrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+    
+                ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
+                    if prompt == vrOrbcamPrompt and prompt.Name == "VROrbcamPrompt" then
+                        Gui.OrbcamOn()
+                    end
+                end)
+            end
+        end
     end
 
     -- Setup Orbcam
@@ -227,8 +253,8 @@ function Gui.Init()
     OrbTweeningStartRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStart)
     OrbTweeningStopRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStop)
 
-    -- In VR we need to tell other clients when we equip the chalk
     if VRService.VREnabled then
+        -- In VR we need to tell other clients when we equip the chalk
         local chalkTool = localPlayer.Backpack:WaitForChild("MetaChalk", 20)
         if chalkTool ~= nil then
             chalkTool.Equipped:Connect(function()
@@ -244,6 +270,15 @@ function Gui.Init()
         else
             print("[MetaOrb] Failed to find MetaChalk tool")
         end
+
+        -- Jump to exit orbcam
+        UserInputService.InputBegan:Connect(function(input)
+            if input.UserInputType ~= Enum.UserInputType.Gamepad1 then return end
+    
+            if Gui.Orbcam and input.KeyCode == Enum.KeyCode.ButtonA then
+                Gui.OrbcamOff()
+            end
+        end)
     end
 	
     Gui.HandleVR()
@@ -364,14 +399,32 @@ function Gui.RemoveEar()
     end
 end
 
--- Refresh the visibility of the normal and speaker proximity prompts
 function Gui.RefreshPrompts(orb)
-    local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
+    if orb == nil then
+        print("[MetaOrb] Passed nil orb to RefreshPrompts")
+        return
+    end
 
-    -- If we are not currently attached as either or speaker
-    -- or listener, make the speaker prompt enabled
-    if speakerPrompt ~= nil and Gui.Orb ~= orb then
-        speakerPrompt.Enabled = Gui.HasSpeakerPermission and not orb:GetAttribute("tweening")
+    local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
+    local normalPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("NormalPrompt") else orb.PrimaryPart:FindFirstChild("NormalPrompt")
+    
+    if orb:GetAttribute("tweening") then
+        normalPrompt.Enabled = false
+        speakerPrompt.Enabled = false
+        return
+    else
+        normalPrompt.Enabled = true
+        speakerPrompt.Enabled = true
+    end
+
+    if orb.Speaker.Value ~= nil then
+        speakerPrompt.Enabled = false
+    else
+        if Gui.Orb ~= orb and Gui.HasSpeakerPermission then
+            speakerPrompt.Enabled = true
+        else
+            speakerPrompt.Enabled = false
+        end
     end
 end
 
@@ -458,6 +511,11 @@ function Gui.Detach()
             local speakerPrompt = if orb:IsA("BasePart") then orb.SpeakerPrompt else orb.PrimaryPart.SpeakerPrompt
             normalPrompt.Enabled = true
             speakerPrompt.Enabled = Gui.HasSpeakerPermission
+
+            if VRService.VREnabled then
+                local vrOrbcamPrompt = if orb:IsA("BasePart") then orb.VROrbcamPrompt else orb.PrimaryPart.VROrbcamPrompt
+                vrOrbcamPrompt.Enabled = false
+            end
         end
 
         Gui.ListenOff()
@@ -644,16 +702,24 @@ function Gui.Attach(orb)
         normalPrompt.Enabled = false
         speakerPrompt.Enabled = false
         
-        Gui.ListenIcon:setEnabled(true)
-        Gui.ListenIcon:select()
-        Gui.OrbcamIcon:setEnabled(true)
-        Gui.OrbReturnIcon:setEnabled(true)
+        if not VRService.VREnabled then
+            Gui.ListenIcon:setEnabled(true)
+            Gui.ListenIcon:select()
+            Gui.OrbcamIcon:setEnabled(true)
+            Gui.OrbReturnIcon:setEnabled(true)
+        end
+
         Gui.ListenOn()
 
         -- Set up initial transparency for VR speakers
         local speaker = Gui.Orb.Speaker.Value
         if speaker ~= nil and orb.VRSpeakerChalkEquipped.Value then
             Gui.MakePlayerTransparent(speaker, 0.2)
+        end
+
+        if VRService.VREnabled then
+            local vrOrbcamPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("VROrbcamPrompt") else orb.PrimaryPart:FindFirstChild("VROrbcamPrompt")
+            vrOrbcamPrompt.Enabled = true
         end
     end
 end
@@ -748,15 +814,6 @@ function Gui.OrbcamTweeningStart(newPos, poi)
     local poiPos = poi:GetPivot().Position
 
     local camera = workspace.CurrentCamera
-	local tweenInfo = TweenInfo.new(
-			Config.TweenTime, -- Time
-			Enum.EasingStyle.Quad, -- EasingStyle
-			Enum.EasingDirection.Out, -- EasingDirection
-			0, -- RepeatCount (when less than zero the tween will loop indefinitely)
-			false, -- Reverses (tween will reverse once reaching it's goal)
-			0 -- DelayTime
-		)
-
 
     -- By default the camera looks from (newPos.X, poiPos.Y, newPos.Z)
     -- but this can be overridden by specifying a Camera ObjectValue
@@ -769,6 +826,28 @@ function Gui.OrbcamTweeningStart(newPos, poi)
             orbCameraPos = cameraPart.Position
         end
     end
+
+    -- Change camera instantly for VR players
+    if VRService.VREnabled then
+        if Gui.VROrbcamConnection ~= nil then
+            Gui.VROrbcamConnection:Disconnect()
+        end
+
+        Gui.VROrbcamConnection = RunService.RenderStepped:Connect(function(dt)
+			workspace.CurrentCamera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
+		end)
+        
+        return
+    end
+
+	local tweenInfo = TweenInfo.new(
+			Config.TweenTime, -- Time
+			Enum.EasingStyle.Quad, -- EasingStyle
+			Enum.EasingDirection.Out, -- EasingDirection
+			0, -- RepeatCount (when less than zero the tween will loop indefinitely)
+			false, -- Reverses (tween will reverse once reaching it's goal)
+			0 -- DelayTime
+		)
 
     local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
 
@@ -945,6 +1024,11 @@ function Gui.OrbcamOn()
     
         Gui.Orbcam = true
         return
+    else
+        if VRService.VREnabled then
+            local vrOrbcamPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("VROrbcamPrompt") else orb.PrimaryPart:FindFirstChild("VROrbcamPrompt")
+            vrOrbcamPrompt.Enabled = false
+        end
     end
 
     -- If the orb is tweening, we use the stored data for poi
@@ -984,10 +1068,20 @@ function Gui.OrbcamOn()
         end
     end
     
-    camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
+    if VRService.VREnabled then
+        if Gui.VROrbcamConnection ~= nil then
+            Gui.VROrbcamConnection:Disconnect()
+        end
 
-    local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
-    camera.FieldOfView = verticalFOV
+        Gui.VROrbcamConnection = RunService.RenderStepped:Connect(function(dt)
+			workspace.CurrentCamera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
+		end)
+    else
+        camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
+
+        local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
+        camera.FieldOfView = verticalFOV
+    end
 
     if guiOff then
         StarterGui:SetCore("TopbarEnabled", false)
@@ -1014,6 +1108,20 @@ function Gui.OrbcamOff()
         camera.FieldOfView = 70
     end
 	
+    if VRService.VREnabled then
+        local orb = Gui.Orb
+        if orb ~= nil then
+            local vrOrbcamPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("VROrbcamPrompt") else orb.PrimaryPart:FindFirstChild("VROrbcamPrompt")
+            if vrOrbcamPrompt then
+                vrOrbcamPrompt.Enabled = true
+            end
+        end
+
+        if Gui.VROrbcamConnection ~= nil then
+            Gui.VROrbcamConnection:Disconnect()
+        end
+    end
+
 	resetCameraSubject()
     Gui.Orbcam = false
 end
