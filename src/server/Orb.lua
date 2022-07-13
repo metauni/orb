@@ -39,6 +39,7 @@ function Orb.Init()
 	Orb.Attachments = {} -- (tostring(playerID) -> orb)
 	Orb.ListeningStatus = {} -- Which players are listening to an orb? For halos (tostring(playerID) -> bool)
 	Orb.OrbCamStatus = {} -- Which players are watching through orbcam? (tostring(playerID) -> bool)
+	Orb.SpeakerLastMoved = {} -- (tostring(playerID) -> last move time)
 
 	local orbs = CollectionService:GetTagged(Config.ObjectTag)
 	for _, orb in ipairs(orbs) do
@@ -76,6 +77,12 @@ function Orb.Init()
 
 	OrbSpeakerMovedRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		if not plr.Character then return end
+
+		local lastMoveTime = Orb.SpeakerLastMoved[tostring(plr.UserId)]
+		if lastMoveTime ~= nil and lastMoveTime > tick() - 5 then return end
+
+		Orb.SpeakerLastMoved[tostring(plr.UserId)] = tick()
+
 		local playerPos = plr.Character.PrimaryPart.Position
 
 		local waypointPos = Orb.TweenOrbToNearPosition(orb, playerPos)
@@ -666,15 +673,15 @@ end
 
 function Orb.TweenOrbToNearPosition(orb, pos)
 	local waypoints = CollectionService:GetTagged(Config.WaypointTag)
-
 	if #waypoints == 0 then return orb:GetPivot().Position end
 
-	-- Find the closest waypoint to the new position
-	-- and move the orb there
+	-- Find the closest waypoint to the new position and move the orb there
 	local minDistance = math.huge
 	local minWaypoint = nil
 
 	for _, waypoint in ipairs(waypoints) do
+		if not waypoint:IsDescendantOf(game.Workspace) then continue end
+
 		local distance = (waypoint.Position - pos).Magnitude
 		if distance < minDistance then
 			minDistance = distance
@@ -683,7 +690,6 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 	end
 
 	if minWaypoint ~= nil then
-		-- If we are already there, don't tween
 		if (minWaypoint.Position - orb:GetPivot().Position).Magnitude < 0.01 then
 			return orb:GetPivot().Position
 		end
@@ -723,16 +729,13 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 			OrbTweeningStopRemoteEvent:FireAllClients(orb)
 		end)
 
-		-- Note that if the position is already being tweened, this will
-		-- stop that tween and commence this one
 		orbTween:Play()
-
-		-- Announce this tween to clients
 		OrbTweeningStartRemoteEvent:FireAllClients(orb, minWaypoint, poi)
 
 		return minWaypoint.Position
 	end
 
+	print("[MetaOrb] Failed to find near waypoint")
 	return orb:GetPivot().Position
 end
 
@@ -883,6 +886,7 @@ function Orb.PointOfInterest(targetPos)
     for _, family in ipairs(families) do
         for _, p in ipairs(family) do
 			if CollectionService:HasTag(p, "metaboard_personal") then continue end
+			if not p:IsDescendantOf(game.Workspace) then continue end
 
             local pos = p:GetPivot().Position
             
@@ -894,6 +898,10 @@ function Orb.PointOfInterest(targetPos)
 			end
         end
     end
+
+	if closestPoi == nil then
+		print("[MetaOrb] Failed to find closest point of interest")
+	end
 
     return closestPoi, closestPos
 end

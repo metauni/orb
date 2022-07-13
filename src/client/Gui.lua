@@ -272,7 +272,6 @@ function Gui.Init()
 
     ContextActionService:BindAction("OrbcamToggle", HandleActivationInput, false, ORBCAM_MACRO_KB[#ORBCAM_MACRO_KB])
 
-    -- Handle orb tweening
     OrbTweeningStartRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStart)
     OrbTweeningStopRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStop)
 
@@ -834,18 +833,17 @@ function Gui.OrbTweeningStart(orb, waypoint, poi)
     end
 
     if poi == nil then
-        print("[Orb] Warning: OrbTweeningStart passed a nil poi")
+        print("[Orb] WARNING: OrbTweeningStart passed a nil poi")
     end
 
     -- Start camera moving if it is enabled, and the tweening
     -- orb is the one we are attached to
-    if Gui.Orb and orb == Gui.Orb and Gui.Orbcam then
+    if orb == Gui.Orb and Gui.Orbcam then
         Gui.OrbcamTweeningStart(waypoint.Position, poi)
     end
 
     -- Store this so people attaching mid-flight can just jump to the target CFrame and FOV
-    targetForOrbTween[orb] = { Waypoint = waypoint,
-                                Poi = poi }
+    targetForOrbTween[orb] = { Waypoint = waypoint:Clone(), Poi = poi:Clone() }
 
     orb:SetAttribute("tweening", true)
     Gui.RefreshPrompts(orb)
@@ -857,9 +855,8 @@ function Gui.OrbTweeningStop(orb)
     Gui.RefreshPrompts(orb)
 end
 
--- Note that we will refuse to move the camera if there is nothing to look _at_
 function Gui.OrbcamTweeningStart(newPos, poi)
-    if Gui.Orbcam == nil then return end
+    if not Gui.Orbcam then return end
     if newPos == nil then
         print("[Orb] OrbcamTweeningStart passed a nil position")
         return
