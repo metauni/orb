@@ -167,7 +167,10 @@ function Orb.Init()
 		orb.VRSpeakerChalkEquipped.Value = false
 	end)
 
-	print("[Orb] Server ".. Config.Version .." initialized")
+	local versionValue = script.Parent:FindFirstChild("version")
+	local ver = versionValue and versionValue.Value or ""
+
+	print("[Orb] Server ".. ver .." initialized")
 end
 
 local function makeRing(size, innerWidth, outerWidth, color)

@@ -1,0 +1,19 @@
+{
+	"name": "orb",
+	"tree": {
+		"$className": "Folder",
+		"$path": "src/server",
+
+		"version": {
+			"$path": "./version.txt"
+		},
+
+		"OrbCommon": {
+			"$path": "src/common"
+		},
+
+		"OrbPlayer" : {
+			"$path": "src/client"
+		}
+	}
+}

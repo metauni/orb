@@ -1,31 +1,24 @@
 {
-	"name": "metauni-orb",
+	"name": "orb",
 	"tree": {
 		"$className": "DataModel",
-
-		"ReplicatedStorage": {
-			"$ignoreUnknownInstances": true,
-			"$className": "ReplicatedStorage",
-			"OrbCommon": {
-				"$path": "src/common"
-			}
-		},
 
 		"ServerScriptService": {
 			"$ignoreUnknownInstances": true,
 			"$className": "ServerScriptService",
-			"metaorb": {
-				"$className": "Folder",
-				"$path": "src/server"
-			}
-		},
 
-		"StarterPlayer": {
-			"$ignoreUnknownInstances": true,
-			"$className": "StarterPlayer",
-			"StarterPlayerScripts": {
-				"$ignoreUnknownInstances": true,
-				"$className": "StarterPlayerScripts",
+			"orb": {
+				"$className": "Folder",
+				"$path": "src/server",
+		
+				"version": {
+					"$path": "./version.txt"
+				},
+		
+				"OrbCommon": {
+					"$path": "src/common"
+				},
+		
 				"OrbPlayer" : {
 					"$path": "src/client"
 				}
