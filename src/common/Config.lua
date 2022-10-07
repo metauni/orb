@@ -5,7 +5,6 @@ local Config = {
 	PointOfInterestTag = "metaorb_poi",
 	SpecialMoveTag = "metaorb_specialmove",
 	DataStoreTag = "orb.",
-	Version = "0.7.9",
 	TweenTime = 5,
 	RopeLength = 10,
 	TransportWaitTime = 10,
