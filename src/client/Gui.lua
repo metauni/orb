@@ -27,6 +27,7 @@ local OrbcamOnRemoteEvent = Common.Remotes.OrbcamOn
 local OrbcamOffRemoteEvent = Common.Remotes.OrbcamOff
 local VRSpeakerChalkEquipRemoteEvent = Common.Remotes.VRSpeakerChalkEquip
 local VRSpeakerChalkUnequipRemoteEvent = Common.Remotes.VRSpeakerChalkUnequip
+local SpecialMoveRemoteEvent = Common.Remotes.SpecialMove
 
 local localPlayer
 
@@ -83,9 +84,11 @@ function Gui.Init()
     --
 
     OrbAttachSpeakerRemoteEvent.OnClientEvent:Connect(function(speaker,orb)
+        wait(0.5) -- wait to make sure we have replicated values
         Gui.RefreshAllPrompts()
     end)
     OrbDetachSpeakerRemoteEvent.OnClientEvent:Connect(function(orb)
+        wait(0.5) -- wait to make sure we have replicated values
         Gui.RefreshAllPrompts()
     end)
 
@@ -192,6 +195,35 @@ function Gui.Init()
             end)
         end
 
+        local specialMovePrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpecialMovePrompt") else orb.PrimaryPart:FindFirstChild("SpecialMovePrompt")
+        if specialMovePrompt == nil and not CollectionService:HasTag(orb, Config.TransportTag) then
+            specialMovePrompt = Instance.new("ProximityPrompt")
+            specialMovePrompt.Name = "SpecialMovePrompt"
+            specialMovePrompt.ActionText = "Special Move"
+            specialMovePrompt.UIOffset = Vector2.new(0,2 * 75)
+            specialMovePrompt.MaxActivationDistance = promptActivationDistance
+            specialMovePrompt.HoldDuration = 1
+            specialMovePrompt.KeyboardKeyCode = Enum.KeyCode.G
+            specialMovePrompt.GamepadKeyCode = Enum.KeyCode.ButtonL2
+            specialMovePrompt.ObjectText = "Orb"
+            specialMovePrompt.RequiresLineOfSight = false
+            specialMovePrompt.Enabled = false
+            specialMovePrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+
+            ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
+                if prompt == specialMovePrompt and prompt.Name == "SpecialMovePrompt" then
+                    local waypoint = Gui.NearestWaypoint(orb:GetPivot().Position)
+                    if waypoint == nil then return end
+                    if waypoint:FindFirstChild("SpecialMove") == nil then return end
+                    if orb:GetAttribute("tweening") then return end
+                    if Gui.Orb ~= orb then return end
+                    if not Gui.Speaking then return end
+
+                    SpecialMoveRemoteEvent:FireServer(Gui.Orb)
+                end
+            end)
+        end
+
         if VRService.VREnabled then
             local vrOrbcamPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("VROrbcamPrompt") else orb.PrimaryPart:FindFirstChild("VROrbcamPrompt")
             if vrOrbcamPrompt == nil and not CollectionService:HasTag(orb, Config.TransportTag) then
@@ -275,6 +307,8 @@ function Gui.Init()
     OrbTweeningStartRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStart)
     OrbTweeningStopRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStop)
 
+    SpecialMoveRemoteEvent.OnClientEvent:Connect(Gui.SpecialMove)
+
     if VRService.VREnabled then
         -- In VR we need to tell other clients when we equip the chalk
         local chalkTool = localPlayer.Backpack:WaitForChild("MetaChalk", 20)
@@ -309,15 +343,54 @@ function Gui.Init()
 	print("[Orb] Gui Initialised")
 end
 
+function Gui.SpecialMove(orb, specialMove, tweenTime)
+    if not Gui.Orbcam then return end
+    if Gui.Orb ~= orb then return end
+
+    if specialMove == nil then
+        print("[Orb] OrbcamTweeningStart passed a nil position")
+        return
+    end
+
+    local camera = workspace.CurrentCamera
+
+    -- Change camera instantly for VR players
+    if VRService.VREnabled then
+        if Gui.VROrbcamConnection ~= nil then
+            Gui.VROrbcamConnection:Disconnect()
+        end
+
+        Gui.VROrbcamConnection = RunService.RenderStepped:Connect(function(dt)
+			workspace.CurrentCamera.CFrame = specialMove.CFrame
+		end)
+        
+        return
+    end
+
+	local tweenInfo = TweenInfo.new(
+			tweenTime, -- Time
+			Enum.EasingStyle.Quad, -- EasingStyle
+			Enum.EasingDirection.Out, -- EasingDirection
+			0, -- RepeatCount (when less than zero the tween will loop indefinitely)
+			false, -- Reverses (tween will reverse once reaching it's goal)
+			0 -- DelayTime
+		)
+
+    Gui.CameraTween = TweenService:Create(camera, tweenInfo, 
+        {CFrame = specialMove.CFrame})
+
+    Gui.CameraTween:Play()
+end
+
 function Gui.MakePlayerTransparent(plr, transparency)
     if plr == nil then
         print("[MetaOrb] Passed nil player to MakePlayerTransparent")
         return
     end
 
-    if plr.Character == nil then return end
-
     local character = plr.Character
+
+    if character == nil then return end
 
     for _, desc in ipairs(character:GetDescendants()) do
 		if desc:IsA("BasePart") then
@@ -428,6 +501,26 @@ function Gui.RefreshAllPrompts()
     end
 end
 
+function Gui.NearestWaypoint(pos)
+	local waypoints = CollectionService:GetTagged(Config.WaypointTag)
+	if #waypoints == 0 then return nil end
+
+	local minDistance = math.huge
+	local minWaypoint = nil
+
+	for _, waypoint in ipairs(waypoints) do
+		if not waypoint:IsDescendantOf(game.Workspace) then continue end
+
+		local distance = (waypoint.Position - pos).Magnitude
+		if distance < minDistance then
+			minDistance = distance
+			minWaypoint = waypoint
+		end
+	end
+
+	return minWaypoint
+end
+
 function Gui.RefreshPrompts(orb)
     if orb == nil then
         print("[MetaOrb] Passed nil orb to RefreshPrompts")
@@ -438,8 +531,10 @@ function Gui.RefreshPrompts(orb)
 
     local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
     local normalPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("NormalPrompt") else orb.PrimaryPart:FindFirstChild("NormalPrompt")
+    local specialMovePrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpecialMovePrompt") else orb.PrimaryPart:FindFirstChild("SpecialMovePrompt")
     if speakerPrompt ~= nil then table.insert(prompts, speakerPrompt) end
     if normalPrompt ~= nil then table.insert(prompts, normalPrompt) end
+    if specialMovePrompt ~= nil then table.insert(prompts, specialMovePrompt) end
 
     local vrOrbcamPrompt, vrDetachPrompt
     if VRService.VREnabled then
@@ -469,6 +564,7 @@ function Gui.RefreshPrompts(orb)
         if speakerPrompt ~= nil then
             speakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == nil
         end
+        if specialMovePrompt ~= nil then specialMovePrompt.Enabled = false end
 
         if VRService.VREnabled then
             if vrOrbcamPrompt ~= nil then vrOrbcamPrompt.Enabled = false end
@@ -479,6 +575,10 @@ function Gui.RefreshPrompts(orb)
     else
         if normalPrompt ~= nil then normalPrompt.Enabled = false end
         if speakerPrompt ~= nil then speakerPrompt.Enabled = false end
+        if specialMovePrompt ~= nil then
+            local waypoint = Gui.NearestWaypoint(orb:GetPivot().Position)
+            specialMovePrompt.Enabled = Gui.Speaking and (waypoint ~= nil) and (waypoint:FindFirstChild("SpecialMove") ~= nil)
+        end
 
         if VRService.VREnabled then
             if vrOrbcamPrompt ~= nil then vrOrbcamPrompt.Enabled = true end

@@ -23,6 +23,7 @@ local GetListeningStatusRemoteFunction = Common.Remotes.GetListeningStatus
 local GetAttachmentsRemoteFunction = Common.Remotes.GetAttachments
 local VRSpeakerChalkEquipRemoteEvent = Common.Remotes.VRSpeakerChalkEquip
 local VRSpeakerChalkUnequipRemoteEvent = Common.Remotes.VRSpeakerChalkUnequip
+local SpecialMoveRemoteEvent = Common.Remotes.SpecialMove
 
 local speakerAttachSoundIds = { 7873470625, 7873470425,
 7873469842, 7873470126, 7864771146, 7864770493, 8214755036, 8214754703}
@@ -78,8 +79,10 @@ function Orb.Init()
 	OrbSpeakerMovedRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		if not plr.Character then return end
 
+		-- We do not move the orb if the speaker movement is within
+		-- a certain interval of the last movement
 		local lastMoveTime = Orb.SpeakerLastMoved[tostring(plr.UserId)]
-		if lastMoveTime ~= nil and lastMoveTime > tick() - 5 then return end
+		if lastMoveTime ~= nil and lastMoveTime > tick() - Config.SpeakerMoveDelay then return end
 
 		Orb.SpeakerLastMoved[tostring(plr.UserId)] = tick()
 
@@ -136,6 +139,12 @@ function Orb.Init()
 		OrbcamOffRemoteEvent:FireAllClients(plr)
 	end)
 
+	SpecialMoveRemoteEvent.OnServerEvent:Connect(function(plr,orb)
+		if plr == orb.Speaker.Value then
+			Orb.SpecialMove(orb)
+		end
+	end)
+
 	-- Remove leaving players as listeners and speakers
 	Players.PlayerRemoving:Connect(function(plr)
 		Orb.DetachPlayer(plr.UserId)
@@ -148,6 +157,17 @@ function Orb.Init()
 		waypoint.Transparency = 1
 		waypoint.Anchored = true
 		waypoint.CanCollide = false
+		waypoint.CastShadow = false
+	end
+
+	-- Make special move positions invisible
+	local specials = CollectionService:GetTagged(Config.SpecialMoveTag)
+
+	for _, s in ipairs(specials) do
+		s.Transparency = 1
+		s.Anchored = true
+		s.CanCollide = false
+		s.CastShadow = false
 	end
 
 	task.spawn(function()
@@ -213,7 +233,6 @@ end
 
 function Orb.InitAVOrb(orb)
 	local speaker = orb:FindFirstChild("Speaker")
-
 	if speaker == nil then
 		speaker = Instance.new("ObjectValue")
 		speaker.Name = "Speaker"
@@ -396,6 +415,34 @@ function Orb.InitTransportOrb(orb)
 	if i > 0 then
 		Orb.TransportNextStop(orb)
 	end
+end
+
+function Orb.SpecialMove(orb)
+	local waypoint = Orb.NearestWaypoint(orb:GetPivot().Position)
+	
+	if waypoint == nil then
+		print("[MetaOrb] Could not find nearest waypoint")
+		return
+	end
+
+	if waypoint:FindFirstChild("SpecialMove") == nil then
+		print("[MetaOrb] This waypoint has no special moves")
+		return
+	end
+
+	local specialMove = waypoint.SpecialMove.Value
+
+	if specialMove == nil then
+		prin("[MetaOrb] Invalid special move")
+		return
+	end
+
+	local tweenTime = 5
+	if specialMove:FindFirstChild("TweenTime") ~= nil then
+		tweenTime = specialMove.TweenTime.Value
+	end
+
+	SpecialMoveRemoteEvent:FireAllClients(orb, specialMove, tweenTime)
 end
 
 function Orb.TransportNextStop(orb)
@@ -671,11 +718,15 @@ function Orb.WalkGhosts(orb, pos)
 	end
 end
 
-function Orb.TweenOrbToNearPosition(orb, pos)
-	local waypoints = CollectionService:GetTagged(Config.WaypointTag)
-	if #waypoints == 0 then return orb:GetPivot().Position end
+function Orb.NearestWaypoint(pos)
+	if pos == nil then
+		print("[MetaOrb] Passed nil position to NearestWaypoint")
+		return
+	end
 
-	-- Find the closest waypoint to the new position and move the orb there
+	local waypoints = CollectionService:GetTagged(Config.WaypointTag)
+	if #waypoints == 0 then return nil end
+
 	local minDistance = math.huge
 	local minWaypoint = nil
 
@@ -688,6 +739,15 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 			minWaypoint = waypoint
 		end
 	end
+
+	return minWaypoint
+end
+
+function Orb.TweenOrbToNearPosition(orb, pos)
+	local waypoints = CollectionService:GetTagged(Config.WaypointTag)
+	if #waypoints == 0 then return orb:GetPivot().Position end
+
+	local minWaypoint = Orb.NearestWaypoint(pos)
 
 	if minWaypoint ~= nil then
 		if (minWaypoint.Position - orb:GetPivot().Position).Magnitude < 0.01 then
@@ -726,6 +786,7 @@ function Orb.TweenOrbToNearPosition(orb, pos)
 		end
 
 		orbTween.Completed:Connect(function()
+			wait(0.5) -- we delay to let clients catch up on orb position
 			OrbTweeningStopRemoteEvent:FireAllClients(orb)
 		end)
 
