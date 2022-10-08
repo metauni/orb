@@ -17,7 +17,7 @@ local Config = {
 	GhostSpawnInterval = 3,
 	GhostSpawnRadius = 50,
 	FOVFactor = 1.1,
-	SpeakerMoveDelay = 2 -- time between tweening orbs on speaker movement
+	SpeakerMoveDelay = 0.1 -- time between tweening orbs on speaker movement
 }
 
 Config.Defaults = {

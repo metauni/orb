@@ -38,6 +38,15 @@ local targetForOrbTween = {} -- orb to target position and poi of tween
 local Gui = {}
 Gui.__index = Gui
 
+local function getInstancePosition(x)
+	if x:IsA("BasePart") then return x.Position end
+	if x:IsA("Model") and x.PrimaryPart ~= nil then
+		return x.PrimaryPart.Position
+	end
+
+	return nil
+end
+
 function Gui.Init()
     localPlayer = Players.LocalPlayer
     Gui.Listening = false
@@ -64,6 +73,7 @@ function Gui.Init()
     Gui.LuggageIcon = nil
     Gui.OrbReturnIcon = nil
     Gui.OrbcamGuiOff = false
+    Gui.PoiHighlightConnection = nil
 
     Gui.InitEar()
 
@@ -594,9 +604,7 @@ end
 -- of interest to the current orb and its position and nil if none can
 -- be found. Note that a point of interest is either nil,
 -- a BasePart or a Model with non-nil PrimaryPart
-function Gui.PointOfInterest()
-    if Gui.Orb == nil then return end
-
+function Gui.PointOfInterest(orbPos)
     local boards = CollectionService:GetTagged("metaboard")
     local pois = CollectionService:GetTagged(Config.PointOfInterestTag)
 
@@ -608,7 +616,6 @@ function Gui.PointOfInterest()
     local minDistance = math.huge
 
     local families = {boards, pois}
-    local orbPos = Gui.Orb:GetPivot().Position
 
     for _, family in ipairs(families) do
         for _, p in ipairs(family) do
@@ -696,7 +703,19 @@ function Gui.AttachSpeaker(orb)
     Gui.RefreshAllPrompts()
     Gui.RefreshTopbarItems()
 
-    -- This event fires when the running speed changes
+    
+
+    local function fireSpeakerMovedEvent()
+        local character = localPlayer.Character
+        if character == nil then return end    
+        local waypoint = Gui.NearestWaypoint(character.PrimaryPart.Position)
+        if waypoint ~= nil then
+            OrbSpeakerMovedRemoteEvent:FireServer(Gui.Orb, waypoint.Position)
+        else
+            print("[MetaOrb] Could not find nearby waypoint")
+        end
+    end
+
     local humanoid = localPlayer.Character:WaitForChild("Humanoid")
     if VRService.VREnabled then
         local counter = 0
@@ -710,7 +729,7 @@ function Gui.AttachSpeaker(orb)
                 
                 if localPlayer.Character ~= nil and localPlayer.Character.PrimaryPart ~= nil then
                     if (localPlayer.Character.PrimaryPart.Position - playerPosAtLastCheck).Magnitude > 2 then
-                        OrbSpeakerMovedRemoteEvent:FireServer(Gui.Orb)
+                        fireSpeakerMovedEvent() 
                     end
                     playerPosAtLastCheck = localPlayer.Character.PrimaryPart.Position
                 end
@@ -718,9 +737,14 @@ function Gui.AttachSpeaker(orb)
         end)
     else
         Gui.RunningConnection = humanoid.Running:Connect(function(speed)
+            if speed > 0 then
+                Gui.EnablePoiHighlights(Gui.Orb)
+            end
+
             if speed == 0 then
                 -- They were moving and then stood still
-                OrbSpeakerMovedRemoteEvent:FireServer(Gui.Orb)
+                Gui.DisablePoiHighlights(Gui.Orb)
+                fireSpeakerMovedEvent()
             end
         end)
     end
@@ -921,29 +945,15 @@ local function resetCameraSubject()
     end
 end
 
-function Gui.OrbTweeningStart(orb, waypoint, poi)
-    if orb == nil then
-        print("[Orb] OrbTweeningStart passed a nil orb")
-        return
-    end
-
-    if waypoint == nil then
-        print("[Orb] OrbTweeningStart passed a nil waypoint")
-        return
-    end
-
-    if poi == nil then
-        print("[Orb] WARNING: OrbTweeningStart passed a nil poi")
-    end
-
+function Gui.OrbTweeningStart(orb, pos, poi)
     -- Start camera moving if it is enabled, and the tweening
     -- orb is the one we are attached to
     if orb == Gui.Orb and Gui.Orbcam then
-        Gui.OrbcamTweeningStart(waypoint.Position, poi)
+        Gui.OrbcamTweeningStart(pos, poi)
     end
 
     -- Store this so people attaching mid-flight can just jump to the target CFrame and FOV
-    targetForOrbTween[orb] = { Waypoint = waypoint:Clone(), Poi = poi:Clone() }
+    targetForOrbTween[orb] = { Position = pos, Poi = poi:Clone() }
 
     orb:SetAttribute("tweening", true)
     Gui.RefreshPrompts(orb)
@@ -1195,10 +1205,10 @@ function Gui.OrbcamOn()
 
     if tweenData ~= nil then
         poi = tweenData.Poi
-        orbPos = tweenData.Waypoint.Position
+        orbPos = tweenData.Position
     else
-        poi = Gui.PointOfInterest()
-        orbPos = orb:GetPivot().Position
+        orbPos = getInstancePosition(orb)
+        poi = Gui.PointOfInterest(orbPos)
     end
 
     if poi == nil or orbPos == nil then
@@ -1210,7 +1220,7 @@ function Gui.OrbcamOn()
         camera.CameraType = Enum.CameraType.Scriptable
     end
 
-    local poiPos = poi:GetPivot().Position    
+    local poiPos = getInstancePosition(poi)
 
     -- By default the camera looks from (orbPos.X, poiPos.Y, orbPos.Z)
     -- but this can be overridden by specifying a Camera ObjectValue
@@ -1288,6 +1298,73 @@ function Gui.ToggleOrbcam()
 	elseif not Gui.Orbcam and Gui.Orb ~= nil then
         Gui.OrbcamOn()
 	end
+end
+
+function Gui.EnablePoiHighlights(orb)
+    if Gui.PoiHighlightConnection ~= nil then
+        Gui.PoiHighlightConnection:Disconnect()
+    end
+
+    local lastPoi = nil
+
+    Gui.PoiHighlightConnection = RunService.RenderStepped:Connect(function(dt)
+        local character = localPlayer.Character
+        if character == nil then return end
+
+        local waypoint = Gui.NearestWaypoint(character.PrimaryPart.Position)
+        local poi = Gui.PointOfInterest(waypoint.Position)
+        if poi == nil then return end
+
+        if poi == lastPoi then
+            -- Don't remake highlights for the same objects
+            return
+        else
+            lastPoi = poi
+        end
+
+        for _, highlight in orb:GetChildren() do
+            if highlight.Name ~= "Highlight" then continue end
+            highlight:Destroy() 
+        end
+
+        local instancesToHighlight = {}
+        
+        for _, c in ipairs(poi:GetChildren()) do
+            if c:IsA("ObjectValue") and c.Name == "Target" then
+                if c.Value ~= nil then
+                    table.insert(instancesToHighlight, c.Value)
+                end
+            end
+        end
+
+        if #instancesToHighlight == 0 then
+            table.insert(instancesToHighlight, poi)
+        end
+
+        for _, x in instancesToHighlight do
+            local xPart = if x:IsA("BasePart") then x else x.PrimaryPart
+            local highlight = Instance.new("Highlight")
+            highlight.Adornee = xPart
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Enabled = true
+            highlight.FillTransparency = 0.9
+            highlight.OutlineColor = Color3.new(1,1,1)
+            highlight.Name = "Highlight"
+            highlight.Parent = orb
+        end
+    end)
+end
+
+function Gui.DisablePoiHighlights(orb)
+    if Gui.PoiHighlightConnection ~= nil then
+        Gui.PoiHighlightConnection:Disconnect()
+        Gui.PoiHighlightConnection = nil
+    end
+
+    for _, highlight in orb:GetChildren() do
+        if highlight.Name ~= "Highlight" then continue end
+        highlight:Destroy() 
+    end
 end
 
 return Gui

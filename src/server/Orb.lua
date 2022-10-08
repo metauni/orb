@@ -28,9 +28,20 @@ local SpecialMoveRemoteEvent = Common.Remotes.SpecialMove
 local speakerAttachSoundIds = { 7873470625, 7873470425,
 7873469842, 7873470126, 7864771146, 7864770493, 8214755036, 8214754703}
 
+local SMALL_DISTANCE = 1e-6
+
 local speakerDetachSoundId = 7864770869
 
 local Orb = {}
+
+local function getInstancePosition(x)
+	if x:IsA("BasePart") then return x.Position end
+	if x:IsA("Model") and x.PrimaryPart ~= nil then
+		return x.PrimaryPart.Position
+	end
+
+	return nil
+end
 
 function Orb.Init()
 	-- Offset of ghosts from orbs (playerID -> Vector3)
@@ -76,27 +87,24 @@ function Orb.Init()
 		OrbAttachSpeakerRemoteEvent:FireAllClients(orb.Speaker.Value, orb)
 	end)
 
-	OrbSpeakerMovedRemoteEvent.OnServerEvent:Connect(function(plr, orb)
-		if not plr.Character then return end
-
+	OrbSpeakerMovedRemoteEvent.OnServerEvent:Connect(function(plr, orb, tweenToPos)
 		-- We do not move the orb if the speaker movement is within
 		-- a certain interval of the last movement
-		local lastMoveTime = Orb.SpeakerLastMoved[tostring(plr.UserId)]
-		if lastMoveTime ~= nil and lastMoveTime > tick() - Config.SpeakerMoveDelay then return end
+		--local lastMoveTime = Orb.SpeakerLastMoved[tostring(plr.UserId)]
+		--if lastMoveTime ~= nil and lastMoveTime > tick() - Config.SpeakerMoveDelay then
+		--	print("[MetaOrb] Within interval of last movement")
+		--	return
+		--end
 
-		Orb.SpeakerLastMoved[tostring(plr.UserId)] = tick()
+		--Orb.SpeakerLastMoved[tostring(plr.UserId)] = tick()
 
-		local playerPos = plr.Character.PrimaryPart.Position
+		Orb.TweenOrbToPosition(orb, tweenToPos)
 
-		local waypointPos = Orb.TweenOrbToNearPosition(orb, playerPos)
-
-		if waypointPos then
-			if (waypointPos - orb:GetPivot().Position).Magnitude > 0.01 then
-				Orb.WalkGhosts(orb, waypointPos)
-			else
-				Orb.RotateGhosts(orb)
-			end
-		end
+		if (tweenToPos - getInstancePosition(orb)).Magnitude > SMALL_DISTANCE then
+			Orb.WalkGhosts(orb, tweenToPos)
+		else
+			Orb.RotateGhosts(orb)
+		end	
 	end)
 
 	-- Handle teleports
@@ -113,7 +121,7 @@ function Orb.Init()
 		else
 			-- This is a speaker
 			local orbSize = if orb:IsA("BasePart") then orb.Size else orb.PrimaryPart.Size
-			targetCFrame = CFrame.new(orb:GetPivot().Position + Vector3.new(0,5 * orbSize.Y,0))
+			targetCFrame = CFrame.new(getInstancePosition(orb) + Vector3.new(0,5 * orbSize.Y,0))
 		end
 
 		plr.Character:PivotTo(targetCFrame)
@@ -262,7 +270,7 @@ function Orb.InitAVOrb(orb)
 
     -- Make a waypoint at the position of every orb
 	local waypoint = Instance.new("Part")
-	waypoint.Position = orb:GetPivot().Position
+	waypoint.Position = getInstancePosition(orb)
 	waypoint.Name = "OriginWaypoint"
 	waypoint.Size = Vector3.new(1,1,1)
 	waypoint.Transparency = 1
@@ -338,7 +346,7 @@ function Orb.InitAVOrb(orb)
 		local orbSpeaker = orb.Speaker.Value
 
 		if orbSpeaker and orbSpeaker.Character then
-			earRingTracker.CFrame = CFrame.lookAt(orbCFrame.Position, orbSpeaker.Character:GetPivot().Position)
+			earRingTracker.CFrame = CFrame.lookAt(orbCFrame.Position, orbSpeaker.Character.PrimaryPart.Position)
 			earRing.CFrame = earRingTracker.CFrame * CFrame.Angles(0, math.pi/2, 0)
 		else
 			earRingTracker.CFrame = eyeRing.CFrame
@@ -421,7 +429,7 @@ function Orb.InitTransportOrb(orb)
 end
 
 function Orb.SpecialMove(orb)
-	local waypoint = Orb.NearestWaypoint(orb:GetPivot().Position)
+	local waypoint = Orb.NearestWaypoint(getInstancePosition(orb))
 	
 	if waypoint == nil then
 		print("[MetaOrb] Could not find nearest waypoint")
@@ -480,7 +488,7 @@ function Orb.TransportNextStop(orb)
 	alignPos.RigidityEnabled = false	
 	alignPos.MaxForce = math.huge
 	alignPos.Position = stopMarker.Position
-	alignPos.MaxVelocity = (orb:GetPivot().Position - stopMarker.Position).Magnitude / stopTime
+	alignPos.MaxVelocity = (getInstancePosition(orb) - stopMarker.Position).Magnitude / stopTime
 	alignPos.Parent = orbPart
 	
 	task.delay( stopTime + Config.TransportWaitTime, Orb.TransportNextStop, orb )
@@ -676,11 +684,11 @@ function Orb.WalkGhost(orb, pos, ghost)
 	if offset ~= nil then
 		newPos = pos + offset
 	else
-		newPos = pos - orb:GetPivot().Position + ghost.PrimaryPart.Position
+		newPos = pos - getInstancePosition(orb) + ghost.PrimaryPart.Position
 	end
 	
 	-- If we're already on our way, don't repeat it
-	local alreadyMoving = (Orb.GhostTargets[ghost.Name] ~= nil) and (Orb.GhostTargets[ghost.Name] - newPos).Magnitude < 0.01
+	local alreadyMoving = (Orb.GhostTargets[ghost.Name] ~= nil) and (Orb.GhostTargets[ghost.Name] - newPos).Magnitude < SMALL_DISTANCE
 
 	if not alreadyMoving then
 		ghost.Humanoid:MoveTo(newPos)
@@ -746,61 +754,51 @@ function Orb.NearestWaypoint(pos)
 	return minWaypoint
 end
 
-function Orb.TweenOrbToNearPosition(orb, pos)
-	local waypoints = CollectionService:GetTagged(Config.WaypointTag)
-	if #waypoints == 0 then return orb:GetPivot().Position end
-
-	local minWaypoint = Orb.NearestWaypoint(pos)
-
-	if minWaypoint ~= nil then
-		if (minWaypoint.Position - orb:GetPivot().Position).Magnitude < 0.01 then
-			return orb:GetPivot().Position
-		end
-
-		-- If there is an orb already there, don't tween
-		local orbs = CollectionService:GetTagged(Config.ObjectTag)
-
-		for _, otherOrb in ipairs(orbs) do
-			if otherOrb ~= orb and (minWaypoint.Position - otherOrb:GetPivot().Position).Magnitude < 0.01 then
-				return orb:GetPivot().Position
-			end
-		end
-
-		local tweenInfo = TweenInfo.new(
-			Config.TweenTime, -- Time
-			Enum.EasingStyle.Quad, -- EasingStyle
-			Enum.EasingDirection.Out, -- EasingDirection
-			0, -- RepeatCount (when less than zero the tween will loop indefinitely)
-			false, -- Reverses (tween will reverse once reaching it's goal)
-			0 -- DelayTime
-		)
-	
-		local poi, poiPos = Orb.PointOfInterest(minWaypoint.Position)
-		
-		local orbTween
-		local orbToTween = if orb:IsA("BasePart") then orb else orb.PrimaryPart
-
-		if poiPos ~= nil then
-			orbTween = TweenService:Create(orbToTween, tweenInfo, 
-				{CFrame = CFrame.lookAt(minWaypoint.Position, poiPos)})
-		else
-			orbTween = TweenService:Create(orbToTween, tweenInfo, 
-				{Position = minWaypoint.Position})
-		end
-
-		orbTween.Completed:Connect(function()
-			wait(0.5) -- we delay to let clients catch up on orb position
-			OrbTweeningStopRemoteEvent:FireAllClients(orb)
-		end)
-
-		orbTween:Play()
-		OrbTweeningStartRemoteEvent:FireAllClients(orb, minWaypoint, poi)
-
-		return minWaypoint.Position
+function Orb.TweenOrbToPosition(orb, pos)
+	if (pos - getInstancePosition(orb)).Magnitude < SMALL_DISTANCE then
+		return
 	end
 
-	print("[MetaOrb] Failed to find near waypoint")
-	return orb:GetPivot().Position
+	-- If there is an orb already there, don't tween
+	local orbs = CollectionService:GetTagged(Config.ObjectTag)
+
+	for _, otherOrb in ipairs(orbs) do
+		if otherOrb ~= orb and (pos - getInstancePosition(otherOrb)).Magnitude < SMALL_DISTANCE then
+			print("[MetaOrb] Waypoint is already occupied by an orb, not tweening")
+			return
+		end
+	end
+
+	local tweenInfo = TweenInfo.new(
+		Config.TweenTime, -- Time
+		Enum.EasingStyle.Quad, -- EasingStyle
+		Enum.EasingDirection.Out, -- EasingDirection
+		0, -- RepeatCount (when less than zero the tween will loop indefinitely)
+		false, -- Reverses (tween will reverse once reaching it's goal)
+		0 -- DelayTime
+	)
+
+	local poi, poiPos = Orb.PointOfInterest(pos)
+	
+	local orbTween
+	local orbToTween = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+
+	if poiPos ~= nil then
+		orbTween = TweenService:Create(orbToTween, tweenInfo, 
+			{CFrame = CFrame.lookAt(pos, poiPos)})
+	else
+		orbTween = TweenService:Create(orbToTween, tweenInfo, 
+			{Position = pos})
+	end
+
+	orbTween.Completed:Connect(function(playbackState)
+		if playbackState == Enum.PlaybackState.Completed then
+			OrbTweeningStopRemoteEvent:FireAllClients(orb)
+		end
+	end)
+
+	orbTween:Play()
+	OrbTweeningStartRemoteEvent:FireAllClients(orb, pos, poi)
 end
 
 -- If a player is attached to an orb and is more than a set distance from the orb
@@ -824,7 +822,7 @@ function Orb.CheckGhosts()
 			end
 		end
 
-		if (orb:GetPivot().Position - playerPos).Magnitude > Config.GhostSpawnRadius then
+		if (getInstancePosition(orb) - playerPos).Magnitude > Config.GhostSpawnRadius then
 			-- Spawn a ghost if none exists
 			if not ghostExists and orb.Speaker.Value ~= plr then
 				Orb.AddGhost(orb, plr)
@@ -844,7 +842,7 @@ function Orb.AddGhost(orb, plr)
 	local ghost = plr.Character:Clone()
 	character.Archivable = false
 
-	local orbPos = orb:GetPivot().Position
+	local orbPos = getInstancePosition(orb)
 	ghost.Name = tostring(plr.UserId)
 	local distanceOrbPlayer = (orbPos - character.PrimaryPart.Position).Magnitude
 	local ghostNowPos = ghost.PrimaryPart.Position:Lerp(orbPos, 0.1)
@@ -926,7 +924,7 @@ function Orb.GetSpeakerPosition(orb)
 	local orbSpeaker = orb.Speaker.Value
 	if orbSpeaker == nil then return nil end
 
-	return orbSpeaker.Character:GetPivot().Position
+	return orbSpeaker.Character.PrimaryPart.Position
 end
 
 -- A point of interest is any object tagged with either
@@ -952,7 +950,7 @@ function Orb.PointOfInterest(targetPos)
 			if CollectionService:HasTag(p, "metaboard_personal") then continue end
 			if not p:IsDescendantOf(game.Workspace) then continue end
 
-            local pos = p:GetPivot().Position
+            local pos = getInstancePosition(p)
             
 			local distance = (pos - targetPos).Magnitude
 			if distance < minDistance then
