@@ -333,7 +333,6 @@ function Orb.InitAVOrb(orb)
 	earRingTracker.Size = Vector3.new(0.1,0.1,0.1)
 	earRingTracker.Parent = orb
 
-	-- Keep the ring orientation fixed to the orb's orientation
 	RunService.Heartbeat:Connect(function(delta)
 		local orbCFrame = if orb:IsA("BasePart") then orb.CFrame else orb.PrimaryPart.CFrame
 

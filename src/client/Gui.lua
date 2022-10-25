@@ -52,15 +52,11 @@ function Gui.Init()
     Gui.Listening = false
     Gui.Speaking = false
 
-    if Gui.Orb then
-        print("[orb] WARNING: Gui.Orb was non-nil on Init")
-    end
-
     Gui.Orb = nil
     Gui.RunningConnection = nil
     Gui.VROrbcamConnection = nil
     Gui.ViewportOn = false
-    Gui.HasSpeakerPermission = true -- can attach as speaker?
+    Gui.HasSpeakerPermission = true
     Gui.Orbcam = false
     Gui.CameraTween = nil
     Gui.Head = nil
@@ -130,153 +126,17 @@ function Gui.Init()
         Gui.HasSpeakerPermission = true
     end
 
-    local promptActivationDistance = 8
-    if VRService.VREnabled then
-        promptActivationDistance = 16
+    for _, orb in CollectionService:GetTagged(Config.ObjectTag) do
+        Gui.SetupProximityPrompts(orb)
     end
 
-    -- Install proximity prompts (note that this gets called again after player reset)
-    local orbs = CollectionService:GetTagged(Config.ObjectTag)
-    for _, orb in ipairs(orbs) do
-        local luggagePrompt = if orb:IsA("BasePart") then orb:FindFirstChild("LuggagePrompt") else orb.PrimaryPart:FindFirstChild("LuggagePrompt")
-        if luggagePrompt == nil and CollectionService:HasTag(orb, Config.TransportTag) then
-            luggagePrompt = Instance.new("ProximityPrompt")
-            luggagePrompt.Name = "LuggagePrompt"
-            luggagePrompt.ActionText = "Attach as Luggage"
-            luggagePrompt.MaxActivationDistance = promptActivationDistance
-            luggagePrompt.HoldDuration = 1
-            luggagePrompt.ObjectText = "Orb"
-            luggagePrompt.RequiresLineOfSight = false
-            luggagePrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
+    CollectionService:GetInstanceAddedSignal(Config.ObjectTag):Connect(function(orb)
+		Gui.SetupProximityPrompts(orb)
+	end)
 
-            if VRService.VREnabled then
-                luggagePrompt.Enabled = false
-            end
-
-            ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
-                if prompt == luggagePrompt and prompt.Name == "LuggagePrompt" then
-                    OrbAttachRemoteEvent:FireServer(orb)
-                    Gui.Attach(orb)
-                end
-            end)
-        end
-
-        local normalPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("NormalPrompt") else orb.PrimaryPart:FindFirstChild("NormalPrompt")
-        if normalPrompt == nil and not CollectionService:HasTag(orb, Config.TransportTag) then
-            normalPrompt = Instance.new("ProximityPrompt")
-            normalPrompt.Name = "NormalPrompt"
-            normalPrompt.ActionText = "Attach as Listener"
-            normalPrompt.MaxActivationDistance = promptActivationDistance
-            normalPrompt.HoldDuration = 1
-            normalPrompt.ObjectText = "Orb"
-            normalPrompt.RequiresLineOfSight = false
-            normalPrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
-
-            ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
-                if prompt == normalPrompt and prompt.Name == "NormalPrompt" then
-                    OrbAttachRemoteEvent:FireServer(orb)
-                    Gui.Attach(orb)
-                end
-            end)
-        end
-
-        local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
-        if speakerPrompt == nil and not CollectionService:HasTag(orb, Config.TransportTag) then
-            speakerPrompt = Instance.new("ProximityPrompt")
-            speakerPrompt.Name = "SpeakerPrompt"
-            speakerPrompt.ActionText = "Attach as Speaker"
-            speakerPrompt.UIOffset = Vector2.new(0,75)
-            speakerPrompt.MaxActivationDistance = promptActivationDistance
-            speakerPrompt.HoldDuration = 1
-            speakerPrompt.KeyboardKeyCode = Enum.KeyCode.F
-            speakerPrompt.GamepadKeyCode = Enum.KeyCode.ButtonY
-            speakerPrompt.ObjectText = "Orb"
-            speakerPrompt.RequiresLineOfSight = false
-            speakerPrompt.Enabled = Gui.HasSpeakerPermission
-            speakerPrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
-
-            ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
-                if prompt == speakerPrompt and prompt.Name == "SpeakerPrompt" then
-                    if orb.Speaker.Value == nil then
-                        OrbAttachSpeakerRemoteEvent:FireServer(orb)
-                        Gui.AttachSpeaker(orb)
-                    end
-                end
-            end)
-        end
-
-        local specialMovePrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpecialMovePrompt") else orb.PrimaryPart:FindFirstChild("SpecialMovePrompt")
-        if specialMovePrompt == nil and not CollectionService:HasTag(orb, Config.TransportTag) then
-            specialMovePrompt = Instance.new("ProximityPrompt")
-            specialMovePrompt.Name = "SpecialMovePrompt"
-            specialMovePrompt.ActionText = "Special Move"
-            specialMovePrompt.UIOffset = Vector2.new(0,2 * 75)
-            specialMovePrompt.MaxActivationDistance = promptActivationDistance
-            specialMovePrompt.HoldDuration = 1
-            specialMovePrompt.KeyboardKeyCode = Enum.KeyCode.G
-            specialMovePrompt.GamepadKeyCode = Enum.KeyCode.ButtonL2
-            specialMovePrompt.ObjectText = "Orb"
-            specialMovePrompt.RequiresLineOfSight = false
-            specialMovePrompt.Enabled = false
-            specialMovePrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
-
-            ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
-                if prompt == specialMovePrompt and prompt.Name == "SpecialMovePrompt" then
-                    local waypoint = Gui.NearestWaypoint(orb:GetPivot().Position)
-                    if waypoint == nil then return end
-                    if waypoint:FindFirstChild("SpecialMove") == nil then return end
-                    if orb:GetAttribute("tweening") then return end
-                    if Gui.Orb ~= orb then return end
-                    if not Gui.Speaking then return end
-
-                    SpecialMoveRemoteEvent:FireServer(Gui.Orb)
-                end
-            end)
-        end
-
-        if VRService.VREnabled then
-            local vrOrbcamPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("VROrbcamPrompt") else orb.PrimaryPart:FindFirstChild("VROrbcamPrompt")
-            if vrOrbcamPrompt == nil and not CollectionService:HasTag(orb, Config.TransportTag) then
-                vrOrbcamPrompt = Instance.new("ProximityPrompt")
-                vrOrbcamPrompt.Name = "VROrbcamPrompt"
-                vrOrbcamPrompt.ActionText = "Enable Orbcam"
-                vrOrbcamPrompt.MaxActivationDistance = promptActivationDistance
-                vrOrbcamPrompt.HoldDuration = 1
-                vrOrbcamPrompt.ObjectText = "Orb"
-                vrOrbcamPrompt.RequiresLineOfSight = false
-                vrOrbcamPrompt.Enabled = false
-                vrOrbcamPrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
-    
-                ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
-                    if prompt == vrOrbcamPrompt and prompt.Name == "VROrbcamPrompt" then
-                        Gui.OrbcamOn()
-                    end
-                end)
-            end
-
-            local vrDetachPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("VRDetachPrompt") else orb.PrimaryPart:FindFirstChild("VRDetachPrompt")
-            if vrDetachPrompt == nil and not CollectionService:HasTag(orb, Config.TransportTag) then
-                vrDetachPrompt = Instance.new("ProximityPrompt")
-                vrDetachPrompt.Name = "VRDetachPrompt"
-                vrDetachPrompt.ActionText = "Detach"
-                vrDetachPrompt.UIOffset = Vector2.new(0,75)
-                vrDetachPrompt.MaxActivationDistance = promptActivationDistance
-                vrDetachPrompt.HoldDuration = 1
-                vrDetachPrompt.KeyboardKeyCode = Enum.KeyCode.F
-                vrDetachPrompt.GamepadKeyCode = Enum.KeyCode.ButtonY
-                vrDetachPrompt.ObjectText = "Orb"
-                vrDetachPrompt.RequiresLineOfSight = false
-                vrDetachPrompt.Enabled = false
-                vrDetachPrompt.Parent = if orb:IsA("BasePart") then orb else orb.PrimaryPart
-    
-                ProximityPromptService.PromptTriggered:Connect(function(prompt, player)
-                    if prompt == vrDetachPrompt and prompt.Name == "VRDetachPrompt" then
-                        Gui.Detach(orb)
-                    end
-                end)
-            end
-        end
-    end
+    CollectionService:GetInstanceRemovedSignal(Config.ObjectTag):Connect(function(orb)
+		Gui.DestroyProximityPrompts(orb)
+	end)
 
     -- Setup Orbcam
     local ORBCAM_MACRO_KB = {Enum.KeyCode.LeftShift, Enum.KeyCode.C}
@@ -313,6 +173,73 @@ function Gui.Init()
     end
 
     ContextActionService:BindAction("OrbcamToggle", HandleActivationInput, false, ORBCAM_MACRO_KB[#ORBCAM_MACRO_KB])
+
+    local ORBCAMVIEW_MACRO_KB = {Enum.KeyCode.LeftShift, Enum.KeyCode.L}
+
+    local function OrbcamViewActivate(action, state, input)
+        if state ~= Enum.UserInputState.Begin then return end
+        if input.KeyCode ~= ORBCAMVIEW_MACRO_KB[#ORBCAMVIEW_MACRO_KB] then return end
+
+        -- Check to see the correct key combination is being pressed
+        for i = 1, #ORBCAMVIEW_MACRO_KB - 1 do
+            if not UserInputService:IsKeyDown(ORBCAMVIEW_MACRO_KB[i]) then
+                return
+            end
+        end
+        
+        if Gui.Orb == nil then return end
+        if not Gui.Orbcam then return end
+
+        local orbPos = getInstancePosition(Gui.Orb)
+        local poi = Gui.PointOfInterest(orbPos)
+        
+        local targets = {}
+        for _, c in ipairs(poi:GetChildren()) do
+            if c:IsA("ObjectValue") and c.Name == "Target" then
+                if c.Value ~= nil then
+                    table.insert(targets, c.Value)
+                end
+            end
+        end
+
+        if #targets < 2 then return end
+
+        local camera = workspace.CurrentCamera
+        local cameraPos = camera.CFrame.Position
+        local focusPos = getInstancePosition(targets[1])
+
+        local newCameraPos = (targets[1].CFrame * CFrame.new(0,0,-20)).Position
+
+        local verticalFOV = Gui.FOVForTargets(newCameraPos, focusPos, {targets[1]}) * 1.1
+
+        print("[Orbcam] Tweening for new view")
+        
+        local tweenInfo = TweenInfo.new(
+			2, -- Time
+			Enum.EasingStyle.Quad, -- EasingStyle
+			Enum.EasingDirection.Out, -- EasingDirection
+			0, -- RepeatCount (when less than zero the tween will loop indefinitely)
+			false, -- Reverses (tween will reverse once reaching it's goal)
+			0 -- DelayTime
+		)
+
+        local poiPos = getInstancePosition(targets[1])
+        
+        if verticalFOV == nil then
+            Gui.CameraTween = TweenService:Create(camera, tweenInfo, 
+                {CFrame = CFrame.lookAt(newCameraPos, poiPos)})
+        else
+            Gui.CameraTween = TweenService:Create(camera, tweenInfo, 
+                {CFrame = CFrame.lookAt(newCameraPos, poiPos),
+                FieldOfView = verticalFOV})
+        end
+
+        Gui.CameraTween:Play()
+
+        return Enum.ContextActionResult.Pass
+    end
+
+    ContextActionService:BindAction("OrbcamToggle", OrbcamViewActivate, false, ORBCAMVIEW_MACRO_KB[#ORBCAMVIEW_MACRO_KB])
 
     OrbTweeningStartRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStart)
     OrbTweeningStopRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStop)
@@ -351,6 +278,125 @@ function Gui.Init()
     Gui.CreateTopbarItems()
 
 	print("[Orb] Gui Initialised")
+end
+
+function Gui.DestroyProximityPrompts(orb)
+    -- Does nothing
+end
+
+function Gui.SetupProximityPrompts(orb)
+    local promptActivationDistance = 8
+    if VRService.VREnabled then
+        promptActivationDistance = 16
+    end
+
+    local function getInstancePart(x)
+        if x:IsA("BasePart") then return x end
+        if x:IsA("Model") then return x.PrimaryPart end
+        return nil
+    end
+
+    local function isNormalOrb(orb)
+        return not CollectionService:HasTag(orb, Config.TransportTag)
+    end
+
+    local function isTransportOrb(orb)
+        return CollectionService:HasTag(orb, Config.TransportTag)
+    end
+
+    local orbPart = getInstancePart(orb)
+    
+    local promptNames = {"LuggagePrompt", "NormalPrompt", "SpeakerPrompt",
+        "SpecialMovePrompt", "VROrbcamPrompt", "VRDetachPrompt" }
+    local promptText = {
+        ["LuggagePrompt"] = "Attach as Luggage",
+        ["NormalPrompt"] = "Attach as Listener",
+        ["SpeakerPrompt"] = "Attach as Speaker",
+        ["SpecialMovePrompt"] = "Special Move",
+        ["VROrbcamPrompt"] = "Enable Orbcam",
+        ["VRDetachPrompt"] = "Detach"
+    }
+
+    for _, promptName in promptNames do
+        local prompt = orbPart:FindFirstChild(promptName)
+        if prompt ~= nil then
+            prompt:Destroy()
+        end
+
+        if promptName == "LuggagePrompt" and not isTransportOrb(orb) then continue end
+        if promptName ~= "LuggagePrompt" and isTransportOrb(orb) then continue end
+        if promptName == "VROrbcamPrompt" and not VRService.VREnabled then continue end
+        if promptName == "VRDetachPrompt" and not VRService.VREnabled then continue end
+
+        prompt = Instance.new("ProximityPrompt")
+        prompt.Name = promptName
+        prompt.ActionText = promptText[promptName]
+        prompt.MaxActivationDistance = promptActivationDistance
+        prompt.HoldDuration = 1
+        prompt.ObjectText = "Orb"
+        prompt.RequiresLineOfSight = false
+
+        if promptName == "SpeakerPrompt" then
+            prompt.UIOffset = Vector2.new(0,75)
+            prompt.KeyboardKeyCode = Enum.KeyCode.F
+            prompt.GamepadKeyCode = Enum.KeyCode.ButtonY
+            prompt.Enabled = Gui.HasSpeakerPermission
+        end
+
+        if promptName == "SpecialMovePrompt" then
+            prompt.UIOffset = Vector2.new(0,2 * 75)
+            prompt.KeyboardKeyCode = Enum.KeyCode.G
+            prompt.GamepadKeyCode = Enum.KeyCode.ButtonL2
+            prompt.Enabled = false    
+        end
+
+        if promptName == "VRDetachPrompt" then
+            prompt.UIOffset = Vector2.new(0,75)
+            prompt.KeyboardKeyCode = Enum.KeyCode.F
+            prompt.GamepadKeyCode = Enum.KeyCode.ButtonY
+        end
+
+        prompt.Parent = orbPart
+
+        if VRService.VREnabled and promptName == "LuggagePrompt" then
+            prompt.Enabled = false
+        end
+
+        ProximityPromptService.PromptTriggered:Connect(function(promptTriggered, player)
+            if promptTriggered ~= prompt then return end
+
+            if promptName == "LuggagePrompt" or promptName == "NormalPrompt" then
+                OrbAttachRemoteEvent:FireServer(orb)
+                Gui.Attach(orb)
+            end
+
+            if promptName == "SpeakerPrompt" then
+                if orb.Speaker.Value == nil then
+                    OrbAttachSpeakerRemoteEvent:FireServer(orb)
+                    Gui.AttachSpeaker(orb)
+                end
+            end
+
+            if promptName == "SpecialMovePrompt" then
+                local waypoint = Gui.NearestWaypoint(orb:GetPivot().Position)
+                if waypoint == nil then return end
+                if waypoint:FindFirstChild("SpecialMove") == nil then return end
+                if orb:GetAttribute("tweening") then return end
+                if Gui.Orb ~= orb then return end
+                if not Gui.Speaking then return end
+
+                SpecialMoveRemoteEvent:FireServer(Gui.Orb)
+            end
+
+            if promptName == "VROrbcamPrompt" then
+                Gui.OrbcamOn()
+            end
+
+            if promptName == "VRDetachPrompt" then
+                Gui.Detach(orb)
+            end
+        end)
+    end
 end
 
 function Gui.SpecialMove(orb, specialMove, tweenTime)
@@ -683,10 +729,12 @@ function Gui.Detach()
         end
 
         -- Make the VR speaker visible again
-        local speaker = Gui.Orb.Speaker.Value
+        local speaker = orb.Speaker.Value
         if speaker ~= nil and orb.VRSpeakerChalkEquipped.Value then
             Gui.MakePlayerTransparent(speaker, 1/0.2)
         end
+
+        Gui.DisablePoiHighlights(orb)
     end
 
     OrbDetachRemoteEvent:FireServer(orb)
@@ -702,8 +750,6 @@ function Gui.AttachSpeaker(orb)
 
     Gui.RefreshAllPrompts()
     Gui.RefreshTopbarItems()
-
-    
 
     local function fireSpeakerMovedEvent()
         local character = localPlayer.Character
@@ -1015,7 +1061,16 @@ function Gui.OrbcamTweeningStart(newPos, poi)
 			0 -- DelayTime
 		)
 
-    local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
+    local targets = {}
+    for _, c in ipairs(poi:GetChildren()) do
+        if c:IsA("ObjectValue") and c.Name == "Target" then
+            if c.Value ~= nil then
+                table.insert(targets, c.Value)
+            end
+        end
+    end
+
+    local verticalFOV = Gui.FOVForTargets(orbCameraPos, poi:GetPivot().Position, targets)
 
     if verticalFOV == nil then
         Gui.CameraTween = TweenService:Create(camera, tweenInfo, 
@@ -1029,29 +1084,16 @@ function Gui.OrbcamTweeningStart(newPos, poi)
     Gui.CameraTween:Play()
 end
 
+
 -- Computes the vertical FOV for the player's camera at the given poi
-function Gui.FOVForPoi(cameraPos, poi)
+function Gui.FOVForTargets(cameraPos, focusPos, targets)
     local camera = workspace.CurrentCamera
-
-    if poi == nil then
-        return camera.FieldOfView
-    end
-
-    -- Adjust the zoom level
-    local targets = {}
-    for _, c in ipairs(poi:GetChildren()) do
-        if c:IsA("ObjectValue") and c.Name == "Target" then
-            if c.Value ~= nil then
-                table.insert(targets, c.Value)
-            end
-        end
-    end
 
     if #targets == 0 then
         return camera.FieldOfView
     end
 
-    local cameraCFrame = CFrame.lookAt(cameraPos, poi:GetPivot().Position)
+    local cameraCFrame = CFrame.lookAt(cameraPos, focusPos)
     local oldCameraCFrame = camera.CFrame
     local oldCameraFieldOfView = camera.FieldOfView
     camera.CFrame = cameraCFrame
@@ -1245,7 +1287,16 @@ function Gui.OrbcamOn()
     else
         camera.CFrame = CFrame.lookAt(orbCameraPos, poiPos)
 
-        local verticalFOV = Gui.FOVForPoi(orbCameraPos, poi)
+        local targets = {}
+        for _, c in ipairs(poi:GetChildren()) do
+            if c:IsA("ObjectValue") and c.Name == "Target" then
+                if c.Value ~= nil then
+                    table.insert(targets, c.Value)
+                end
+            end
+        end
+
+        local verticalFOV = Gui.FOVForTargets(orbCameraPos, poi:GetPivot().Position, targets)
         camera.FieldOfView = verticalFOV
     end
 
