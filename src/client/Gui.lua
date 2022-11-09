@@ -239,7 +239,7 @@ function Gui.Init()
         return Enum.ContextActionResult.Pass
     end
 
-    ContextActionService:BindAction("OrbcamToggle", OrbcamViewActivate, false, ORBCAMVIEW_MACRO_KB[#ORBCAMVIEW_MACRO_KB])
+    ContextActionService:BindAction("OrbcamViewToggle", OrbcamViewActivate, false, ORBCAMVIEW_MACRO_KB[#ORBCAMVIEW_MACRO_KB])
 
     OrbTweeningStartRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStart)
     OrbTweeningStopRemoteEvent.OnClientEvent:Connect(Gui.OrbTweeningStop)
@@ -797,31 +797,6 @@ function Gui.AttachSpeaker(orb)
 end
 
 function Gui.RefreshTopbarItems()
-    if Gui.OrbcamIcon == nil then
-        print("[MetaOrb] WARNING: OrbcamIcon nil")
-        return
-    end
-
-    if Gui.ListenIcon == nil then
-        print("[MetaOrb] WARNING: ListenIcon nil")
-        return
-    end
-
-    if Gui.SpeakerIcon == nil then
-        print("[MetaOrb] WARNING: SpeakerIcon nil")
-        return
-    end
-
-    if Gui.OrbReturnIcon == nil then
-        print("[MetaOrb] WARNING: OrbReturnIcon nil")
-        return
-    end
-
-    if Gui.LuggageIcon == nil then
-        print("[MetaOrb] WARNING: LuggageIcon nil")
-        return
-    end
-
     Gui.OrbcamIcon:setEnabled(false)
     Gui.ListenIcon:setEnabled(false)
     Gui.SpeakerIcon:setEnabled(false)
