@@ -285,9 +285,9 @@ function Gui.DestroyProximityPrompts(orb)
 end
 
 function Gui.SetupProximityPrompts(orb)
-    local promptActivationDistance = 8
+    local promptActivationDistance = 24
     if VRService.VREnabled then
-        promptActivationDistance = 16
+        promptActivationDistance = 24
     end
 
     local function getInstancePart(x)
