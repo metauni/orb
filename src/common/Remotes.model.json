@@ -70,6 +70,10 @@
 			"ClassName": "RemoteEvent"
 		},
 		{
+			"Name": "AskQuestion",
+			"ClassName": "RemoteEvent"
+		},
+		{
 			"Name": "SpecialMove",
 			"ClassName": "RemoteEvent"
 		}

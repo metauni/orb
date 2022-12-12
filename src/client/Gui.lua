@@ -1,5 +1,4 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Common = game:GetService("ReplicatedStorage").OrbCommon
 local SoundService = game:GetService("SoundService")
 local ContextActionService = game:GetService("ContextActionService")
 local UserInputService = game:GetService("UserInputService")
@@ -9,8 +8,9 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local VRService = game:GetService("VRService")
-
 local Players = game:GetService("Players")
+
+local Common = game:GetService("ReplicatedStorage").OrbCommon
 local Config = require(Common.Config)
 
 local OrbAttachRemoteEvent = Common.Remotes.OrbAttach
@@ -28,6 +28,7 @@ local OrbcamOffRemoteEvent = Common.Remotes.OrbcamOff
 local VRSpeakerChalkEquipRemoteEvent = Common.Remotes.VRSpeakerChalkEquip
 local VRSpeakerChalkUnequipRemoteEvent = Common.Remotes.VRSpeakerChalkUnequip
 local SpecialMoveRemoteEvent = Common.Remotes.SpecialMove
+local AskQuestionRemoteEvent = Common.Remotes.AskQuestion
 
 local localPlayer
 
@@ -307,14 +308,15 @@ function Gui.SetupProximityPrompts(orb)
     local orbPart = getInstancePart(orb)
     
     local promptNames = {"LuggagePrompt", "NormalPrompt", "SpeakerPrompt",
-        "SpecialMovePrompt", "VROrbcamPrompt", "VRDetachPrompt" }
+        "SpecialMovePrompt", "VROrbcamPrompt", "VRDetachPrompt", "AskPrompt" }
     local promptText = {
         ["LuggagePrompt"] = "Attach as Luggage",
         ["NormalPrompt"] = "Attach as Listener",
         ["SpeakerPrompt"] = "Attach as Speaker",
         ["SpecialMovePrompt"] = "Special Move",
         ["VROrbcamPrompt"] = "Enable Orbcam",
-        ["VRDetachPrompt"] = "Detach"
+        ["VRDetachPrompt"] = "Detach",
+        ["AskPrompt"] = "Ask a Question"
     }
 
     for _, promptName in promptNames do
@@ -343,9 +345,16 @@ function Gui.SetupProximityPrompts(orb)
             prompt.Enabled = Gui.HasSpeakerPermission
         end
 
-        if promptName == "SpecialMovePrompt" then
-            prompt.UIOffset = Vector2.new(0,2 * 75)
+        if promptName == "AskPrompt" then
+            --prompt.UIOffset = Vector2.new(0,-75)
             prompt.KeyboardKeyCode = Enum.KeyCode.G
+            prompt.GamepadKeyCode = Enum.KeyCode.ButtonA
+            prompt.Enabled = false
+        end
+
+        if promptName == "SpecialMovePrompt" then
+            prompt.UIOffset = Vector2.new(0,3 * 75)
+            prompt.KeyboardKeyCode = Enum.KeyCode.H
             prompt.GamepadKeyCode = Enum.KeyCode.ButtonL2
             prompt.Enabled = false    
         end
@@ -374,6 +383,36 @@ function Gui.SetupProximityPrompts(orb)
                 if orb.Speaker.Value == nil then
                     OrbAttachSpeakerRemoteEvent:FireServer(orb)
                     Gui.AttachSpeaker(orb)
+                end
+            end
+
+            if promptName == "AskPrompt" then
+                local askGui = localPlayer.PlayerGui:FindFirstChild("AskQuestionGui")
+                if askGui ~= nil then
+                    askGui.Enabled = true
+                    prompt.Enabled = false
+                    askGui.ButtonFrame.SendButton.Activated:Connect(function()
+                        prompt.Enabled = true
+                    end)
+                    askGui.ButtonFrame.CancelButton.Activated:Connect(function()
+                        prompt.Enabled = true
+                    end)
+                    
+                    if UserInputService.KeyboardEnabled then
+                        local keyHeld = UserInputService:IsKeyDown(prompt.KeyboardKeyCode)
+                        if keyHeld then
+                            UserInputService.InputEnded:Connect(function(input, gameProcessedEvent)
+                                if gameProcessedEvent then return end
+                                
+                                if input.KeyCode == prompt.KeyboardKeyCode then
+                                    RunService.RenderStepped:Wait()
+                                    askGui.ButtonFrame.TextBox:CaptureFocus()
+                                end
+                            end)
+                        end
+                    else
+                        askGui.ButtonFrame.TextBox:CaptureFocus()
+                    end
                 end
             end
 
@@ -587,9 +626,11 @@ function Gui.RefreshPrompts(orb)
 
     local speakerPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpeakerPrompt") else orb.PrimaryPart:FindFirstChild("SpeakerPrompt")
     local normalPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("NormalPrompt") else orb.PrimaryPart:FindFirstChild("NormalPrompt")
+    local askPrompt = if orb:IsA("BasePart") then orb:FindFirstChild("AskPrompt") else orb.PrimaryPart:FindFirstChild("AskPrompt")
     local specialMovePrompt = if orb:IsA("BasePart") then orb:FindFirstChild("SpecialMovePrompt") else orb.PrimaryPart:FindFirstChild("SpecialMovePrompt")
     if speakerPrompt ~= nil then table.insert(prompts, speakerPrompt) end
     if normalPrompt ~= nil then table.insert(prompts, normalPrompt) end
+    if askPrompt ~= nil then table.insert(prompts, askPrompt) end
     if specialMovePrompt ~= nil then table.insert(prompts, specialMovePrompt) end
 
     local vrOrbcamPrompt, vrDetachPrompt
@@ -617,6 +658,7 @@ function Gui.RefreshPrompts(orb)
 
     if Gui.Orb ~= orb then
         if normalPrompt ~= nil then normalPrompt.Enabled = true end
+        if askPrompt ~= nil then askPrompt.Enabled = false end
         if speakerPrompt ~= nil then
             speakerPrompt.Enabled = Gui.HasSpeakerPermission and orb.Speaker.Value == nil
         end
@@ -630,6 +672,7 @@ function Gui.RefreshPrompts(orb)
         if luggagePrompt ~= nil then luggagePrompt.Enabled = true end
     else
         if normalPrompt ~= nil then normalPrompt.Enabled = false end
+        if askPrompt ~= nil then askPrompt.Enabled = true end
         if speakerPrompt ~= nil then speakerPrompt.Enabled = false end
         if specialMovePrompt ~= nil then
             local waypoint = Gui.NearestWaypoint(orb:GetPivot().Position)
