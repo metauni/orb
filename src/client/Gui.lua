@@ -316,7 +316,7 @@ function Gui.SetupProximityPrompts(orb)
         ["SpecialMovePrompt"] = "Special Move",
         ["VROrbcamPrompt"] = "Enable Orbcam",
         ["VRDetachPrompt"] = "Detach",
-        ["AskPrompt"] = "Ask a Question"
+        ["AskPrompt"] = "Ask the AI"
     }
 
     for _, promptName in promptNames do
