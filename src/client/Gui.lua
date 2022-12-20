@@ -10,7 +10,7 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 local VRService = game:GetService("VRService")
 local Players = game:GetService("Players")
 
-local Common = game:GetService("ReplicatedStorage").OrbCommon
+local Common = ReplicatedStorage.OrbCommon
 local Config = require(Common.Config)
 
 local OrbAttachRemoteEvent = Common.Remotes.OrbAttach
@@ -277,8 +277,43 @@ function Gui.Init()
 	
     Gui.HandleVR()
     Gui.CreateTopbarItems()
+    Gui.HandleAskQuestionGui()
 
 	print("[Orb] Gui Initialised")
+end
+
+function Gui.HandleAskQuestionGui()
+    local screenGui = localPlayer.PlayerGui:WaitForChild("AskQuestionGui")
+    local textBox = screenGui.ButtonFrame.TextBox
+    local ACTION = "SubmitMessage"
+    
+    local function sendAction()
+        if Gui.Orb == nil then
+            print("[Orb] Triggered Ask Question event without being attached to an orb")
+            return
+        end
+        
+        screenGui.Enabled = false
+        AskQuestionRemoteEvent:FireServer(Gui.Orb, textBox.Text)
+        textBox.Text = ""
+    end
+    
+    local sendButton = screenGui.ButtonFrame.SendButton
+    sendButton.Activated:Connect(sendAction)
+    
+    local function cancelAction()
+        screenGui.Enabled = false
+        textBox.Text = ""
+    end
+    
+    local cancelButton = screenGui.ButtonFrame.CancelButton
+    cancelButton.Activated:Connect(cancelAction)
+    
+    local function handleAction(actionName, inputState, inputObject)
+        if actionName == ACTION and inputState == Enum.UserInputState.End then
+            sendAction()
+        end
+    end
 end
 
 function Gui.DestroyProximityPrompts(orb)
@@ -387,7 +422,7 @@ function Gui.SetupProximityPrompts(orb)
             end
 
             if promptName == "AskPrompt" then
-                local askGui = localPlayer.PlayerGui:FindFirstChild("AskQuestionGui")
+                local askGui = localPlayer.PlayerGui:WaitForChild("AskQuestionGui")
                 if askGui ~= nil then
                     askGui.Enabled = true
                     prompt.Enabled = false
