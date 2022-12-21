@@ -919,13 +919,18 @@ function Gui.CreateTopbarItems()
     -- eye icon is https://fonts.google.com/icons?icon.query=eye
     -- luggage is https://fonts.google.com/icons?icon.query=luggage
     -- return is https://fonts.google.com/icons?icon.query=back
+    local earIconAssetId = "rbxassetid://11877012409"
+    local eyeIconAssetId = "rbxassetid://11877012219"
+    local returnIconAssetId = "rbxassetid://11877012097"
+    local speakerIconAssetId = "rbxassetid://11877027636"
+
     local Icon = require(game:GetService("ReplicatedStorage").Icon)
     local Themes =  require(game:GetService("ReplicatedStorage").Icon.Themes)
     
     local icon, iconEye, iconSpeaker, iconLuggage, iconReturn, iconBoardcam
 
     icon = Icon.new()
-    icon:setImage("rbxassetid://9675350772")
+    icon:setImage(earIconAssetId)
     icon:setLabel("Listener")
     icon:setEnabled(false)
     icon.deselectWhenOtherIconSelected = false
@@ -941,7 +946,7 @@ function Gui.CreateTopbarItems()
     Gui.ListenIcon = icon
 
     iconSpeaker = Icon.new()
-    iconSpeaker:setImage("rbxassetid://9675604658")
+    iconSpeaker:setImage(speakerIconAssetId)
     iconSpeaker:setLabel("Speaker")
     iconSpeaker:setTheme(Themes["BlueGradient"])
     iconSpeaker:setEnabled(false)
@@ -973,7 +978,7 @@ function Gui.CreateTopbarItems()
     Gui.LuggageIcon = iconLuggage
 
     iconEye = Icon.new()
-    iconEye:setImage("rbxassetid://9675397382")
+    iconEye:setImage(eyeIconAssetId)
     iconEye:setLabel("Orbcam")
     iconEye:setTheme(Themes["BlueGradient"])
     iconEye:setEnabled(false)
@@ -988,7 +993,7 @@ function Gui.CreateTopbarItems()
     Gui.OrbcamIcon = iconEye
 
     iconReturn = Icon.new()
-    iconReturn:setImage("rbxassetid://9727704068")
+    iconReturn:setImage(returnIconAssetId)
     iconReturn:setTheme(Themes["BlueGradient"])
     iconReturn:setEnabled(false)
     iconReturn:bindEvent("selected", function(self)
@@ -998,8 +1003,8 @@ function Gui.CreateTopbarItems()
     Gui.OrbReturnIcon = iconReturn
 
     iconBoardcam = Icon.new()
-    iconBoardcam:setImage("rbxassetid://9675397382")
-    iconBoardcam:setLabel("Boardcam")
+    iconBoardcam:setImage(eyeIconAssetId)
+    iconBoardcam:setLabel("Look")
     iconBoardcam:setTheme(Themes["BlueGradient"])
     iconBoardcam:setEnabled(true)
     iconBoardcam.deselectWhenOtherIconSelected = false
