@@ -107,7 +107,6 @@ function Orb.Init()
 		end	
 	end)
 
-	-- Handle teleports
 	OrbTeleportRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		if not plr and plr.Character then return end
 		if not orb then return end

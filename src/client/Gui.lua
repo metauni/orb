@@ -69,8 +69,11 @@ function Gui.Init()
     Gui.SpeakerIcon = nil
     Gui.LuggageIcon = nil
     Gui.OrbReturnIcon = nil
+    Gui.BoardcamIcon = nil
     Gui.OrbcamGuiOff = false
     Gui.PoiHighlightConnection = nil
+    Gui.Boardcam = false
+    Gui.BoardcamHighlightConnection = nil
 
     Gui.InitEar()
 
@@ -919,7 +922,7 @@ function Gui.CreateTopbarItems()
     local Icon = require(game:GetService("ReplicatedStorage").Icon)
     local Themes =  require(game:GetService("ReplicatedStorage").Icon.Themes)
     
-    local icon, iconEye, iconSpeaker, iconLuggage, iconReturn
+    local icon, iconEye, iconSpeaker, iconLuggage, iconReturn, iconBoardcam
 
     icon = Icon.new()
     icon:setImage("rbxassetid://9675350772")
@@ -976,6 +979,7 @@ function Gui.CreateTopbarItems()
     iconEye:setEnabled(false)
     iconEye.deselectWhenOtherIconSelected = false
     iconEye:bindEvent("selected", function(self)
+        iconBoardcam:deselect()
         Gui.ToggleOrbcam(false)
     end)
     iconEye:bindEvent("deselected", function(self)
@@ -992,6 +996,27 @@ function Gui.CreateTopbarItems()
         iconReturn:deselect()
     end)
     Gui.OrbReturnIcon = iconReturn
+
+    iconBoardcam = Icon.new()
+    iconBoardcam:setImage("rbxassetid://9675397382")
+    iconBoardcam:setLabel("Boardcam")
+    iconBoardcam:setTheme(Themes["BlueGradient"])
+    iconBoardcam:setEnabled(true)
+    iconBoardcam.deselectWhenOtherIconSelected = false
+    iconBoardcam:bindEvent("selected", function(self)
+        iconEye:deselect()
+        Gui.ToggleBoardcam()
+    end)
+    iconBoardcam:bindEvent("deselected", function(self)
+        Gui.ToggleBoardcam()
+    end)
+    iconBoardcam:bindEvent("hoverStarted", function(self)
+        Gui.BoardcamHoverStarted()
+    end)
+    iconBoardcam:bindEvent("hoverEnded", function(self)
+        Gui.BoardcamHoverEnded()
+    end)
+    Gui.BoardcamIcon = iconBoardcam
 end
 
 function Gui.Attach(orb)
@@ -1254,6 +1279,175 @@ function Gui.FOVForTargets(cameraPos, focusPos, targets)
     return verticalFOV
 end
 
+function Gui.BoardcamHoverEnded()
+    if Gui.BoardcamHighlightConnection ~= nil then
+        Gui.BoardcamHighlightConnection:Disconnect()
+        Gui.BoardcamHighlightConnection = nil
+    end
+
+    local boardcamHighlightFolder = game.Workspace:FindFirstChild("BoardcamHighlights")
+    if boardcamHighlightFolder ~= nil then
+        boardcamHighlightFolder:ClearAllChildren()
+    end
+end
+
+function Gui.BoardcamHoverStarted()
+    -- Don't show highlights while Boardcam is on
+    if Gui.Boardcam then return end
+
+    if Gui.BoardcamHighlightConnection ~= nil then
+        Gui.BoardcamHighlightConnection:Disconnect()
+    end
+
+    local lastPoi = nil
+
+    local boardcamHighlightFolder = game.Workspace:FindFirstChild("BoardcamHighlights")
+    if boardcamHighlightFolder == nil then
+        boardcamHighlightFolder = Instance.new("Folder")
+        boardcamHighlightFolder.Name = "BoardcamHighlights"
+        boardcamHighlightFolder.Parent = game.Workspace
+    end
+
+    Gui.BoardcamHighlightConnection = RunService.RenderStepped:Connect(function(dt)
+        local character = localPlayer.Character
+        if character == nil then return end
+
+        local function nearbyWaypoint(pos)
+            local w = Gui.NearestWaypoint(pos)
+            -- if (w.Position - pos).Magnitude > 10 then return nil end
+            return w
+        end
+    
+        local charPos = character.PrimaryPart.Position
+        local waypoint = nearbyWaypoint(charPos)
+        local waypointPos = waypoint.Position
+        local poi = Gui.PointOfInterest(waypointPos)
+        
+        if poi == nil then return end
+
+        if poi == lastPoi then
+            -- Don't remake highlights for the same objects
+            return
+        else
+            local boardcamHighlightFolder = game.Workspace:FindFirstChild("BoardcamHighlights")
+            if boardcamHighlightFolder ~= nil then
+                boardcamHighlightFolder:ClearAllChildren()
+            end
+            lastPoi = poi
+        end
+
+        local instancesToHighlight = {}
+        
+        for _, c in ipairs(poi:GetChildren()) do
+            if c:IsA("ObjectValue") and c.Name == "Target" then
+                if c.Value ~= nil then
+                    table.insert(instancesToHighlight, c.Value)
+                end
+            end
+        end
+
+        if #instancesToHighlight == 0 then
+            table.insert(instancesToHighlight, poi)
+        end
+
+        for _, x in instancesToHighlight do
+            local xPart = if x:IsA("BasePart") then x else x.PrimaryPart
+            local highlight = Instance.new("Highlight")
+            highlight.Adornee = xPart
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            highlight.Enabled = true
+            highlight.FillTransparency = 0.9
+            highlight.OutlineColor = Color3.fromRGB(231, 227, 170)
+            highlight.Name = "Highlight"
+            highlight.Parent = boardcamHighlightFolder
+        end
+    end)
+end
+
+function Gui.BoardcamOn()
+    local character = localPlayer.Character
+    if character == nil or character.PrimaryPart == nil then
+        print("[Orb] Cannot activate boardcam with nil character")
+        return
+    end
+
+    local camera = workspace.CurrentCamera
+	storedCameraFOV = camera.FieldOfView
+	if character.Head then
+		storedCameraOffset = camera.CFrame.Position - character.Head.Position
+	end
+
+    -- We prefer the following views, in order of preference
+    --
+    -- 1. From a nearby waypoint (as though in Orbcam)
+    -- 2. A nearby board
+    --
+    -- However (2) divides into two cases
+    --
+    -- 2a. There is a clearest nearby single board
+    -- 2b. There are two roughly equidistant boards
+    --
+    -- In the former case we look at the board, in the latter we
+    -- figure out a reasonable place to look from to view both
+    -- boards
+
+    local function nearbyWaypoint(pos)
+        local w = Gui.NearestWaypoint(pos)
+        -- if (w.Position - pos).Magnitude > 10 then return nil end
+        return w
+    end
+
+    local charPos = character.PrimaryPart.Position
+    local waypoint = nearbyWaypoint(charPos)
+    local waypointPos = waypoint.Position
+
+    if waypoint ~= nil then
+        local poi = Gui.PointOfInterest(waypointPos)
+        if poi == nil then
+            print("[Orb] Could not find point of interest to look at")
+            return
+        end
+        local poiPos = getInstancePosition(poi)
+
+        if camera.CameraType ~= Enum.CameraType.Scriptable then
+            camera.CameraType = Enum.CameraType.Scriptable
+        end
+
+        local cameraPos = Vector3.new(waypointPos.X, poiPos.Y, waypointPos.Z)
+        camera.CFrame = CFrame.lookAt(cameraPos, poiPos)
+
+        local targets = {}
+        for _, c in ipairs(poi:GetChildren()) do
+            if c:IsA("ObjectValue") and c.Name == "Target" then
+                if c.Value ~= nil then
+                    table.insert(targets, c.Value)
+                end
+            end
+        end
+
+        local verticalFOV = Gui.FOVForTargets(cameraPos, getInstancePosition(poi), targets)
+        camera.FieldOfView = verticalFOV
+    else
+        print("[Orb] Not near a waypoint")
+    end
+    
+    Gui.Boardcam = true
+end
+
+function Gui.BoardcamOff()
+
+    local camera = workspace.CurrentCamera
+	camera.CameraType = Enum.CameraType.Custom
+    if storedCameraFOV ~= nil then
+        camera.FieldOfView = storedCameraFOV
+    else
+        camera.FieldOfView = 70
+    end
+
+	resetCameraSubject()
+    Gui.Boardcam = false
+end
+
 function Gui.OrbcamOn()
     local guiOff = Gui.OrbcamGuiOff
     OrbcamOnRemoteEvent:FireServer()
@@ -1396,10 +1590,30 @@ function Gui.OrbcamOff()
     Gui.Orbcam = false
 end
 
+function Gui.ToggleBoardcam()
+    if Gui.Boardcam then
+        Gui.BoardcamOff()
+        if Gui.BoardcamIcon.hovering then
+            Gui.BoardcamHoverStarted()
+        end
+    else
+        if Gui.Orbcam then
+            Gui.ToggleOrbcam()
+        end
+
+        Gui.BoardcamOn()
+        Gui.BoardcamHoverEnded()
+    end
+end
+
 function Gui.ToggleOrbcam()
     if Gui.Orbcam then
 		Gui.OrbcamOff()
 	elseif not Gui.Orbcam and Gui.Orb ~= nil then
+        if Gui.Boardcam then
+            Gui.ToggleBoardcam()
+        end
+
         Gui.OrbcamOn()
 	end
 end
