@@ -215,8 +215,6 @@ function Gui.Init()
         local newCameraPos = (targets[1].CFrame * CFrame.new(0,0,-20)).Position
 
         local verticalFOV = Gui.FOVForTargets(newCameraPos, focusPos, {targets[1]}) * 1.1
-
-        print("[Orbcam] Tweening for new view")
         
         local tweenInfo = TweenInfo.new(
 			2, -- Time
@@ -283,6 +281,11 @@ function Gui.Init()
     Gui.HandleAskQuestionGui()
 
 	print("[Orb] Gui Initialised")
+end
+
+function Gui.OnResetCharacter()
+    Gui.RefreshTopbarItems()
+    Gui.InitEar()
 end
 
 function Gui.HandleAskQuestionGui()
@@ -1407,6 +1410,7 @@ function Gui.BoardcamOn()
     local waypointPos = waypoint.Position
 
     if waypoint ~= nil then
+        Gui.LastWaypointForBoardcam = waypoint
         local poi = Gui.PointOfInterest(waypointPos)
         if poi == nil then
             print("[Orb] Could not find point of interest to look at")

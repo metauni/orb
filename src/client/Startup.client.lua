@@ -20,7 +20,7 @@ end
 
 Players.LocalPlayer.CharacterAdded:Connect(function(character)
 	-- When resetting
-	Gui.Init()
+	Gui.OnResetCharacter()
 end)
 
 Players.LocalPlayer.CharacterRemoving:Connect(function()
