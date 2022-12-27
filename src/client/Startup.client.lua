@@ -8,7 +8,7 @@ if Common:GetAttribute("OrbServerInitialised") == nil then
 end
 
 local localPlayer = Players.LocalPlayer
-local localCharacter = localPlayer.Character
+local localCharacter = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 
 local Gui = require(script.Parent.Gui)
 local Halos = require(script.Parent.Halos)
