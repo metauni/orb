@@ -2,8 +2,9 @@ local CollectionService = game:GetService("CollectionService")
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Common = game:GetService("ReplicatedStorage").OrbCommon
+local Common = ReplicatedStorage.OrbCommon
 local Config = require(Common.Config)
 
 local OrbAttachRemoteEvent = Common.Remotes.OrbAttach
@@ -196,6 +197,9 @@ function Orb.Init()
 
 	local versionValue = script.Parent:FindFirstChild("version")
 	local ver = versionValue and versionValue.Value or ""
+
+    -- Indicate that the system has been setup enough for clients to do their setup
+    Common:SetAttribute("OrbServerInitialised", true)
 
 	print("[Orb] Server ".. ver .." initialized")
 end

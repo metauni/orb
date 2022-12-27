@@ -1,8 +1,11 @@
 local Players = game:GetService("Players")
 local SoundService = game:GetService("SoundService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local OrbDummyGui = Players.LocalPlayer.PlayerGui:WaitForChild("OrbDummyGui",math.huge)
 local Common = ReplicatedStorage:WaitForChild("OrbCommon")
+
+if Common:GetAttribute("OrbServerInitialised") == nil then
+    Common:GetAttributeChangedSignal("OrbServerInitialised"):Wait()
+end
 
 local localPlayer = Players.LocalPlayer
 local localCharacter = localPlayer.Character
