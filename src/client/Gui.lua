@@ -1075,8 +1075,8 @@ function Gui.CreateTopbarItems()
     end)
     Gui.OrbReturnIcon = iconReturn
 
-    availableEmojis = {":thumbsup:",":thumbsdown:",":smiley:",":pray:",":thinking:",":fire:",":ok_hand:",":100:",
-            ":confused:",":pensive:",":raised_eyebrow:",":mind_blown:",":face_with_monocle:",":x:"}
+    availableEmojis = {":thumbsup:",":thumbsdown:",":smiley:",":rotating_light:",":pray:",":fire:",":ok_hand:",":100:",
+            ":mind_blown:",":repeat:",":x:"}
 
     iconEmoji = Icon.new()
     iconEmoji:setLabel("😃")
