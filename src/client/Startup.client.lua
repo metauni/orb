@@ -14,12 +14,8 @@ local Gui = require(script.Parent.Gui)
 local Halos = require(script.Parent.Halos)
 local Config = require(Common.Config)
 
+Gui.Init()
 Halos.Init()
-
-if localCharacter then
-	-- When joining the game
-	Gui.Init()
-end
 
 Players.LocalPlayer.CharacterAdded:Connect(function(character)
 	-- When resetting

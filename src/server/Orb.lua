@@ -25,6 +25,7 @@ local GetAttachmentsRemoteFunction = Common.Remotes.GetAttachments
 local VRSpeakerChalkEquipRemoteEvent = Common.Remotes.VRSpeakerChalkEquip
 local VRSpeakerChalkUnequipRemoteEvent = Common.Remotes.VRSpeakerChalkUnequip
 local SpecialMoveRemoteEvent = Common.Remotes.SpecialMove
+local NewEmojiRemoteEvent = Common.Remotes.NewEmoji
 
 local speakerAttachSoundIds = { 7873470625, 7873470425,
 7873469842, 7873470126, 7864771146, 7864770493, 8214755036, 8214754703}
@@ -107,6 +108,10 @@ function Orb.Init()
 			Orb.RotateGhosts(orb)
 		end	
 	end)
+
+    NewEmojiRemoteEvent.OnServerEvent:Connect(function(plr, orb, emojiName)
+        NewEmojiRemoteEvent:FireAllClients(plr, orb, emojiName)
+    end)
 
 	OrbTeleportRemoteEvent.OnServerEvent:Connect(function(plr, orb)
 		if not plr and plr.Character then return end

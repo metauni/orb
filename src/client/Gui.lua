@@ -12,6 +12,7 @@ local Players = game:GetService("Players")
 
 local Common = ReplicatedStorage.OrbCommon
 local Config = require(Common.Config)
+local EmojiList = require(Common.EmojiList)
 
 local OrbAttachRemoteEvent = Common.Remotes.OrbAttach
 local OrbDetachRemoteEvent = Common.Remotes.OrbDetach
@@ -29,6 +30,7 @@ local VRSpeakerChalkEquipRemoteEvent = Common.Remotes.VRSpeakerChalkEquip
 local VRSpeakerChalkUnequipRemoteEvent = Common.Remotes.VRSpeakerChalkUnequip
 local SpecialMoveRemoteEvent = Common.Remotes.SpecialMove
 local AskQuestionRemoteEvent = Common.Remotes.AskQuestion
+local NewEmojiRemoteEvent = Common.Remotes.NewEmoji
 
 local localPlayer
 
@@ -70,6 +72,7 @@ function Gui.Init()
     Gui.LuggageIcon = nil
     Gui.OrbReturnIcon = nil
     Gui.BoardcamIcon = nil
+    Gui.EmojiIcon = nil
     Gui.OrbcamGuiOff = false
     Gui.PoiHighlightConnection = nil
     Gui.Boardcam = false
@@ -101,6 +104,9 @@ function Gui.Init()
         wait(0.5) -- wait to make sure we have replicated values
         Gui.RefreshAllPrompts()
     end)
+
+    Gui.SetupEmojiGui()
+    NewEmojiRemoteEvent.OnClientEvent:Connect(Gui.HandleNewEmoji)
 
     -- If the Admin system is installed, the permission specified there
 	-- overwrites the default "true" state of HasWritePermission
@@ -286,6 +292,61 @@ end
 function Gui.OnResetCharacter()
     Gui.RefreshTopbarItems()
     Gui.InitEar()
+end
+
+function Gui.SetupEmojiGui()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "EmojiGui"
+    screenGui.ResetOnSpawn = false
+    screenGui.Parent = localPlayer.PlayerGui
+end
+
+function Gui.AddEmojiToScreen(emojiName:string)
+    local emojiText = EmojiList[emojiName]
+    if emojiText == nil then
+        print("[Gui] Bad emoji name")
+        return
+    end
+
+    local xOffset = math.random(-10,10)
+    local yOffset = math.random(-5,5)
+    local originalPos = UDim2.new(0, 50 + xOffset, 0.7, yOffset)
+    local finalPos = UDim2.new(0, 50 + 1.5 * xOffset, 0.2, 0)
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Text = emojiText
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextScaled = true
+    textLabel.Size = UDim2.new(0,50,0,50)
+    textLabel.Position = originalPos
+    textLabel.Parent = localPlayer.PlayerGui.EmojiGui
+
+    local tweenInfo = TweenInfo.new(
+        1.4, -- Time
+        Enum.EasingStyle.Linear, -- EasingStyle
+        Enum.EasingDirection.Out, -- EasingDirection
+        0, -- RepeatCount (when less than zero the tween will loop indefinitely)
+        false, -- Reverses (tween will reverse once reaching it's goal)
+        0 -- DelayTime
+    )
+
+    local tween = TweenService:Create(textLabel, tweenInfo, 
+                {Position = finalPos,
+                TextTransparency = 1})
+    
+    tween:Play()
+
+    tween.Completed:Connect(function(playbackState)
+		if playbackState == Enum.PlaybackState.Completed then
+			textLabel:Destroy()
+		end
+	end)
+end
+
+function Gui.HandleNewEmoji(sourcePlayer:instance, orb:instance, emojiName:string)
+    if orb ~= Gui.Orb then return end
+    if sourcePlayer == localPlayer then return end -- already handled
+    Gui.AddEmojiToScreen(emojiName)
 end
 
 function Gui.HandleAskQuestionGui()
@@ -821,6 +882,7 @@ function Gui.Detach()
         Gui.DisablePoiHighlights(orb)
     end
 
+    localPlayer.PlayerGui.EmojiGui:ClearAllChildren() -- remove emojis
     OrbDetachRemoteEvent:FireServer(orb)
     Gui.Orb = nil
     Gui.RefreshAllPrompts()
@@ -886,6 +948,7 @@ function Gui.RefreshTopbarItems()
     Gui.SpeakerIcon:setEnabled(false)
     Gui.OrbReturnIcon:setEnabled(false)
     Gui.LuggageIcon:setEnabled(false)
+    Gui.EmojiIcon:setEnabled(false)
 
     local orb = Gui.Orb
     if orb == nil then return end
@@ -902,12 +965,14 @@ function Gui.RefreshTopbarItems()
         Gui.SpeakerIcon:select()
         Gui.OrbcamIcon:setEnabled(true)
         Gui.OrbReturnIcon:setEnabled(true)
+        Gui.EmojiIcon:setEnabled(true)
     else
         if not VRService.VREnabled then
             Gui.ListenIcon:setEnabled(true)
             Gui.ListenIcon:select()
             Gui.OrbcamIcon:setEnabled(true)
             Gui.OrbReturnIcon:setEnabled(true)
+            Gui.EmojiIcon:setEnabled(true)
         end
     end
 end
@@ -930,11 +995,12 @@ function Gui.CreateTopbarItems()
     local Icon = require(game:GetService("ReplicatedStorage").Icon)
     local Themes =  require(game:GetService("ReplicatedStorage").Icon.Themes)
     
-    local icon, iconEye, iconSpeaker, iconLuggage, iconReturn, iconBoardcam
+    local icon, iconEye, iconSpeaker, iconLuggage, iconReturn, iconBoardcam, iconEmoji
 
     icon = Icon.new()
     icon:setImage(earIconAssetId)
     icon:setLabel("Listener")
+    icon:setOrder(2)
     icon:setEnabled(false)
     icon.deselectWhenOtherIconSelected = false
     icon:bindEvent("deselected", function(self)
@@ -950,6 +1016,7 @@ function Gui.CreateTopbarItems()
 
     iconSpeaker = Icon.new()
     iconSpeaker:setImage(speakerIconAssetId)
+    iconSpeaker:setOrder(2)
     iconSpeaker:setLabel("Speaker")
     iconSpeaker:setTheme(Themes["BlueGradient"])
     iconSpeaker:setEnabled(false)
@@ -966,6 +1033,7 @@ function Gui.CreateTopbarItems()
 
     iconLuggage = Icon.new()
     iconLuggage:setImage("rbxassetid://9679458066")
+    iconLuggage:setOrder(2)
     iconLuggage:setLabel("Luggage")
     iconLuggage:setTheme(Themes["BlueGradient"])
     iconLuggage:setEnabled(false)
@@ -983,6 +1051,7 @@ function Gui.CreateTopbarItems()
     iconEye = Icon.new()
     iconEye:setImage(eyeIconAssetId)
     iconEye:setLabel("Orbcam")
+    iconEye:setOrder(3)
     iconEye:setTheme(Themes["BlueGradient"])
     iconEye:setEnabled(false)
     iconEye.deselectWhenOtherIconSelected = false
@@ -997,6 +1066,7 @@ function Gui.CreateTopbarItems()
 
     iconReturn = Icon.new()
     iconReturn:setImage(returnIconAssetId)
+    iconReturn:setOrder(5)
     iconReturn:setTheme(Themes["BlueGradient"])
     iconReturn:setEnabled(false)
     iconReturn:bindEvent("selected", function(self)
@@ -1005,9 +1075,35 @@ function Gui.CreateTopbarItems()
     end)
     Gui.OrbReturnIcon = iconReturn
 
+    availableEmojis = {":thumbsup:",":thumbsdown:",":smiley:",":pray:",":thinking:",":fire:",":ok_hand:",":100:",
+            ":confused:",":pensive:",":raised_eyebrow:",":mind_blown:",":face_with_monocle:",":x:"}
+
+    iconEmoji = Icon.new()
+    iconEmoji:setLabel("😃")
+    iconEmoji:setOrder(6)
+    iconEmoji:setEnabled(false)
+    iconEmoji:set("dropdownSquareCorners", true)
+	iconEmoji:set("dropdownMaxIconsBeforeScroll", 7)
+
+    emojiIcons = {}
+    for _, e in availableEmojis do
+        table.insert(emojiIcons, Icon.new()
+                                    :setLabel(EmojiList[e])
+                                    :bindEvent("selected", function(self)
+                                        self:deselect()
+                                        iconEmoji:deselect()
+                                        NewEmojiRemoteEvent:FireServer(Gui.Orb, e)
+                                        Gui.AddEmojiToScreen(e)
+                                    end))
+    end
+
+	iconEmoji:setDropdown(emojiIcons)
+    Gui.EmojiIcon = iconEmoji
+
     iconBoardcam = Icon.new()
     iconBoardcam:setImage(eyeIconAssetId)
     iconBoardcam:setLabel("Look")
+    iconBoardcam:setOrder(4)
     iconBoardcam:setTheme(Themes["BlueGradient"])
     iconBoardcam:setEnabled(true)
     iconBoardcam.deselectWhenOtherIconSelected = false
