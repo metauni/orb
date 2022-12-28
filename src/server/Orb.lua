@@ -352,7 +352,7 @@ function Orb.InitAVOrb(orb)
 		-- otherwise in the same direction as the eye ring
 		local orbSpeaker = orb.Speaker.Value
 
-		if orbSpeaker and orbSpeaker.Character then
+		if orbSpeaker and orbSpeaker.Character and orbSpeaker.Character.PrimaryPart then
 			earRingTracker.CFrame = CFrame.lookAt(orbCFrame.Position, orbSpeaker.Character.PrimaryPart.Position)
 			earRing.CFrame = earRingTracker.CFrame * CFrame.Angles(0, math.pi/2, 0)
 		else
