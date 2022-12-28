@@ -1066,7 +1066,7 @@ function Gui.CreateTopbarItems()
 
     iconReturn = Icon.new()
     iconReturn:setImage(returnIconAssetId)
-    iconReturn:setOrder(5)
+    iconReturn:setOrder(6)
     iconReturn:setTheme(Themes["BlueGradient"])
     iconReturn:setEnabled(false)
     iconReturn:bindEvent("selected", function(self)
@@ -1075,12 +1075,12 @@ function Gui.CreateTopbarItems()
     end)
     Gui.OrbReturnIcon = iconReturn
 
-    availableEmojis = {":thumbsup:",":thumbsdown:",":smiley:",":rotating_light:",":pray:",":fire:",":ok_hand:",":100:",
-            ":mind_blown:",":repeat:",":x:"}
+    availableEmojis = {":thumbsup:",":thumbsdown:",":smiley:",":grimacing:",":mind_blown:",
+            ":pray:",":fire:",":ok_hand:",":100:",":repeat:"}
 
     iconEmoji = Icon.new()
     iconEmoji:setLabel("😃")
-    iconEmoji:setOrder(6)
+    iconEmoji:setOrder(5)
     iconEmoji:setEnabled(false)
     iconEmoji:set("dropdownSquareCorners", true)
 	iconEmoji:set("dropdownMaxIconsBeforeScroll", 7)
