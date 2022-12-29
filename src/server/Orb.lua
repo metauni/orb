@@ -4,7 +4,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Common = ReplicatedStorage.OrbCommon
+local Common = ReplicatedStorage:WaitForChild("OrbCommon")
 local Config = require(Common.Config)
 
 local OrbAttachRemoteEvent = Common.Remotes.OrbAttach
